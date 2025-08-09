@@ -1,5 +1,7 @@
 # Article Automation for success test post 
 
+![Article Automation](image.png)
+
 This project automates the process of synchronizing content between GitHub README files and various blogging platforms.
 
 ## Overview
@@ -46,3 +48,4 @@ Next platform to be integrated
   - workflow or actions:write (to update repo variables)
 2. Add the PAT as a secret named `VAR_EDIT_TOKEN_GIT` (or change the workflow accordingly).
 3. Trigger the workflow on your repo.
+
