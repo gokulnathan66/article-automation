@@ -3,79 +3,38 @@ import fs from 'fs/promises';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 
-// Fix for ES modules: get __dirname
+// --- ES module __dirname support ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Optionally, allow loading saved post from env (for "update" capability)
-async function getSavedPostDetailsFromEnv() {
-  if (process.env.SAVED_POST_ID) {
-    return {
-      id: process.env.SAVED_POST_ID,
-      title: process.env.SAVED_POST_TITLE,
-      url: process.env.SAVED_POST_URL,
-      published_at: process.env.SAVED_POST_PUBLISHED_AT,
-      updated_at: process.env.SAVED_POST_UPDATED_AT,
-    };
-  }
-  return null;
-}
-
+// --- Utility: Try multiple README file names ---
 async function getReadmeData() {
-  // Try different possible README file names (case-sensitive filesystems)
-  const possibleReadmeFiles = ['README.md', 'Readme.md', 'readme.md'];
-  let readmePath = null;
-  let content = null;
-
-  // Debug: show current working directory and list files (use stderr to avoid polluting JSON output)
-  console.error("Current working directory:", process.cwd());
   const rootDir = path.resolve(__dirname, '..');
-  console.error("Looking for README in directory:", rootDir);
-  
-  try {
-    const files = await fs.readdir(rootDir);
-    console.error("Files in root directory:", files);
-  } catch (error) {
-    console.error("Could not list root directory:", error.message);
-  }
+  const possibleFiles = ['README.md', 'Readme.md', 'readme.md'];
 
-  // Try to find the README file with different case variations
-  for (const filename of possibleReadmeFiles) {
-    const testPath = path.resolve(__dirname, '..', filename);
+  for (const filename of possibleFiles) {
     try {
-      console.error("Trying to read:", testPath);
-      content = await fs.readFile(testPath, 'utf-8');
-      readmePath = testPath;
-      console.error("Successfully found README at:", readmePath);
-      break;
-    } catch (error) {
-      console.error(`File ${filename} not found, trying next...`);
-    }
+      const filepath = path.join(rootDir, filename);
+      const content = await fs.readFile(filepath, 'utf-8');
+      const titleLine = content.split('\n').find(line => line.startsWith('# '));
+      const title = titleLine ? titleLine.replace(/^#\s+/, '').trim() : 'Untitled Post';
+      return { title, body: content.trim() };
+    } catch {}
   }
-
-  if (!content) {
-    throw new Error(`README file not found. Tried: ${possibleReadmeFiles.join(', ')}`);
-  }
-
-  const lines = content.split('\n');
-  const titleLine = lines.find(line => line.startsWith('# '));
-  const title = titleLine ? titleLine.replace(/^#\s+/, '').trim() : 'Untitled Post';
-  const body = content.trim();
-
-  return { title, body };
+  throw new Error(`README file not found. Searched: ${possibleFiles.join(', ')}`);
 }
 
-async function postOrUpdateArticle() {
-  // Try to get existing post data from environment
-  const savedPost = await getSavedPostDetailsFromEnv();
+// --- Core logic: Post or update ---
+export async function postOrUpdateArticle({ existingEnv }) {
   const { title, body } = await getReadmeData();
 
-  const method = savedPost ? 'PUT' : 'POST';
-  const url = savedPost
-    ? `https://dev.to/api/articles/${savedPost.id}`
-    : 'https://dev.to/api/articles';
+  const isUpdating = !!existingEnv?.id;
+  const apiUrl = isUpdating
+    ? `https://dev.to/api/articles/${existingEnv.id}`
+    : `https://dev.to/api/articles`;
+  const method = isUpdating ? 'PUT' : 'POST';
 
-  const response = await fetch(url, {
+  const response = await fetch(apiUrl, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -86,7 +45,7 @@ async function postOrUpdateArticle() {
         title,
         body_markdown: body,
         published: true,
-        tags: ['tag1', 'tag2'], // You can customize/extract tags if needed
+        tags: ['tag1', 'tag2'],
       },
     }),
   });
@@ -94,36 +53,46 @@ async function postOrUpdateArticle() {
   const data = await response.json();
 
   if (response.ok) {
-    // Output post details as JSON for the workflow to read and export
     const postDetails = {
       id: data.id,
       title: data.title,
       url: data.url,
       published_at: data.published_at,
       updated_at: data.edited_at,
+      method,
     };
-    console.log(JSON.stringify(postDetails));
+    console.log(JSON.stringify(postDetails)); // for workflow step
+    return postDetails;
   } else {
-    // Log error details to stderr for debugging
-    console.error('Error posting/updating article:', data);
-    
-    // Output error details as JSON to stdout so workflow can still parse it
+    // Error output for debugging and workflow
     const errorDetails = {
       error: true,
-      message: data.error || 'Unknown error',
+      message: data.error || response.statusText || 'Unknown error',
       status: response.status,
-      id: null,
-      title: null,
-      url: null,
-      published_at: null,
-      updated_at: null
+      ...existingEnv,
     };
+    console.error('Error posting/updating:', errorDetails.message);
     console.log(JSON.stringify(errorDetails));
-    process.exit(1); // Still fail the workflow step
+    process.exit(1);
   }
 }
 
-postOrUpdateArticle().catch(error => {
-  console.error(error);
-  process.exit(1); // Fail workflow step
+// --- Entrypoint: Reads current env vars if present ---
+async function main() {
+  // Try to read env variables (for update path)
+  const envVars = {
+    id: process.env.SAVED_POST_ID,
+    title: process.env.SAVED_POST_TITLE,
+    url: process.env.SAVED_POST_URL,
+    published_at: process.env.SAVED_POST_PUBLISHED_AT,
+    updated_at: process.env.SAVED_POST_UPDATED_AT,
+  };
+  // Only pass non-null if id is present
+  const existingEnv = envVars.id ? envVars : null;
+  await postOrUpdateArticle({ existingEnv });
+}
+
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
 });

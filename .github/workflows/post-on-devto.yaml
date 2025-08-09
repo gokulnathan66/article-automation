@@ -2,15 +2,30 @@ name: Post on Dev.to
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   post-on-devto:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Restore saved post env
+        id: load_saved_post_env
+        run: |
+          # If .env.SAVED_POST exists, source it
+          if [[ -f .env.SAVED_POST ]]; then
+            echo "Loading saved post env:"
+            cat .env.SAVED_POST
+            set -a
+            source .env.SAVED_POST
+            set +a
+          else
+            echo "No previous saved post env found."
+          fi
+        shell: bash
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -23,38 +38,55 @@ jobs:
       - name: Debug repo files
         run: |
           pwd
-          echo "Files in root directory:"
           ls -la
-          echo "Files in api directory:"
           ls -la api/
 
-      - name: Run post script and set env variables
+      - name: Run post script and capture output
+        id: run_post
         run: |
-          # Run Node.js script, output JSON metadata to a temp file
-          # Debug output goes to stderr, JSON output goes to stdout
+          # Export env vars if they exist (for update)
+          export SAVED_POST_ID="${SAVED_POST_ID:-}"
+          export SAVED_POST_TITLE="${SAVED_POST_TITLE:-}"
+          export SAVED_POST_URL="${SAVED_POST_URL:-}"
+          export SAVED_POST_PUBLISHED_AT="${SAVED_POST_PUBLISHED_AT:-}"
+          export SAVED_POST_UPDATED_AT="${SAVED_POST_UPDATED_AT:-}"
+
           node api/post.js > post_output.json
 
-          # Show the actual output for debugging
           echo "Script output:"
           cat post_output.json
-          
-          # Verify JSON is valid before parsing
+
           if jq empty post_output.json 2>/dev/null; then
             echo "JSON is valid, extracting fields..."
-            # Export fields from output as environment variables
             echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
+
+            # Save for future workflows (commit if changed)
+            echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" > .env.SAVED_POST
+            echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> .env.SAVED_POST
+            echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> .env.SAVED_POST
+            echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> .env.SAVED_POST
+            echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> .env.SAVED_POST
           else
             echo "Error: Output is not valid JSON"
-            echo "Raw output:"
             cat post_output.json
             exit 1
           fi
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
+
+      - name: Commit updated env file
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          if [[ -f .env.SAVED_POST ]]; then
+            git add .env.SAVED_POST
+            git diff --cached --quiet .env.SAVED_POST || git commit -m "Update Dev.to post env"
+            git push
+          fi
 
       - name: Show post info
         run: |
