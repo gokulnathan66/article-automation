@@ -20,6 +20,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Debug repo files
+        run: |
+          pwd
+          echo "Files in root directory:"
+          ls -la
+          echo "Files in api directory:"
+          ls -la api/
+
       - name: Run post script and set env variables
         run: |
           # Run Node.js script, output JSON metadata to a temp file
