@@ -2,17 +2,18 @@ name: Post on Dev.to
 
 on:
   push:
-    branches: [main]
+    branches: [main]  # Trigger on pushes to 'main' branch
 
 jobs:
   post-on-devto:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout code for access to README.md and script
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Load repo variables into env at the start
+      # 2️⃣ Load any previously saved repo variables into environment
       - name: Load saved post variables as env
         run: |
           echo "SAVED_POST_ID=${{ vars.SAVED_POST_ID }}" >> $GITHUB_ENV
@@ -21,20 +22,24 @@ jobs:
           echo "SAVED_POST_PUBLISHED_AT=${{ vars.SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
           echo "SAVED_POST_UPDATED_AT=${{ vars.SAVED_POST_UPDATED_AT }}" >> $GITHUB_ENV
 
+      # 3️⃣ Setup Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '24'
 
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # 5️⃣ (Optional debug) List repo structure
       - name: Debug repo files
         run: |
           pwd
           ls -la
           ls -la api/
 
+      # 6️⃣ Run your post/update script, output JSON
       - name: Run post script and capture output
         id: run_post
         run: |
@@ -51,66 +56,44 @@ jobs:
             echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
           else
-            echo "Error: Output is not valid JSON"
+            echo "❌ Error: Output is not valid JSON"
             cat post_output.json
             exit 1
           fi
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
 
-      - name: Save post details to repo variables (requires PAT)
+      # 7️⃣ Save details back into GitHub Repo Variables (Persistent between runs)
+      - name: Save post details to repo variables
         run: |
           if jq -e 'has("error") | not' post_output.json; then
-            echo "Updating GitHub repository variables..."
+            echo "✅ Updating GitHub repository variables..."
 
-            # ID
-            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_ID \
-              -f name="SAVED_POST_ID" \
-              -f value="$(jq -r '.id' post_output.json)" || \
-            gh api --method POST /repos/${{ github.repository }}/actions/variables \
-              -f name="SAVED_POST_ID" \
-              -f value="$(jq -r '.id' post_output.json)"
+            for var in SAVED_POST_ID SAVED_POST_TITLE SAVED_POST_URL SAVED_POST_PUBLISHED_AT SAVED_POST_UPDATED_AT
+            do
+              VALUE=$(jq -r '.id' post_output.json)
+              if [ "$var" = "SAVED_POST_TITLE" ]; then VALUE=$(jq -r '.title' post_output.json); fi
+              if [ "$var" = "SAVED_POST_URL" ]; then VALUE=$(jq -r '.url' post_output.json); fi
+              if [ "$var" = "SAVED_POST_PUBLISHED_AT" ]; then VALUE=$(jq -r '.published_at' post_output.json); fi
+              if [ "$var" = "SAVED_POST_UPDATED_AT" ]; then VALUE=$(jq -r '.updated_at' post_output.json); fi
 
-            # TITLE
-            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_TITLE \
-              -f name="SAVED_POST_TITLE" \
-              -f value="$(jq -r '.title' post_output.json)" || \
-            gh api --method POST /repos/${{ github.repository }}/actions/variables \
-              -f name="SAVED_POST_TITLE" \
-              -f value="$(jq -r '.title' post_output.json)"
-
-            # URL
-            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_URL \
-              -f name="SAVED_POST_URL" \
-              -f value="$(jq -r '.url' post_output.json)" || \
-            gh api --method POST /repos/${{ github.repository }}/actions/variables \
-              -f name="SAVED_POST_URL" \
-              -f value="$(jq -r '.url' post_output.json)"
-
-            # PUBLISHED_AT
-            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_PUBLISHED_AT \
-              -f name="SAVED_POST_PUBLISHED_AT" \
-              -f value="$(jq -r '.published_at' post_output.json)" || \
-            gh api --method POST /repos/${{ github.repository }}/actions/variables \
-              -f name="SAVED_POST_PUBLISHED_AT" \
-              -f value="$(jq -r '.published_at' post_output.json)"
-
-            # UPDATED_AT
-            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_UPDATED_AT \
-              -f name="SAVED_POST_UPDATED_AT" \
-              -f value="$(jq -r '.updated_at' post_output.json)" || \
-            gh api --method POST /repos/${{ github.repository }}/actions/variables \
-              -f name="SAVED_POST_UPDATED_AT" \
-              -f value="$(jq -r '.updated_at' post_output.json)"
+              gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
+                -f name="$var" \
+                -f value="$VALUE" || \
+              gh api --method POST /repos/${{ github.repository }}/actions/variables \
+                -f name="$var" \
+                -f value="$VALUE"
+            done
           else
-            echo "Skipped saving repo variables due to errors."
+            echo "⏭ Skipped saving repo variables due to errors."
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # ✅ Use your PAT here
+          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # 🔑 User-provided PAT with repo + actions:write
 
+      # 8️⃣ Final output
       - name: Show post info
         run: |
-          echo "Article posted/updated."
+          echo "📢 Article posted/updated."
           echo "ID: $SAVED_POST_ID"
           echo "Title: $SAVED_POST_TITLE"
           echo "URL: $SAVED_POST_URL"

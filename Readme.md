@@ -38,3 +38,11 @@ Next platform to be integrated
 
 - Store API keys securely in environment variables
 - Save post IDs in secrets for automated updates
+
+# Setup Instructions
+
+1. Generate a Personal Access Token (PAT) with the following scopes:
+  - repo (for private repos)
+  - workflow or actions:write (to update repo variables)
+2. Add the PAT as a secret named `VAR_EDIT_TOKEN_GIT` (or change the workflow accordingly).
+3. Trigger the workflow on your repo.
