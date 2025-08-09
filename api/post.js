@@ -24,8 +24,8 @@ async function getSavedPostDetailsFromEnv() {
 }
 
 async function getReadmeData() {
-  const readmePath = path.join(process.cwd(), 'README.md');
-  const content = await fs.readFile(readmePath, 'utf-8');
+    const readmePath = path.resolve(__dirname, '..', 'README.md');
+    const content = await fs.readFile(readmePath, 'utf-8');
 
   const lines = content.split('\n');
   const titleLine = lines.find(line => line.startsWith('# '));
