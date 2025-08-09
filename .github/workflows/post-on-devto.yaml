@@ -62,6 +62,9 @@ jobs:
           fi
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
+          GITHUB_USERNAME: ${{ github.repository_owner }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+          GITHUB_BRANCH: ${{ github.ref_name }}
 
       # 7️⃣ Save details back into GitHub Repo Variables (Persistent between runs)
       - name: Save post details to repo variables
