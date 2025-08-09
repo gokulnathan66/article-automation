@@ -49,3 +49,6 @@ Next platform to be integrated
 2. Add the PAT as a secret named `VAR_EDIT_TOKEN_GIT` (or change the workflow accordingly).
 3. Trigger the workflow on your repo.
 
+the tags need to be extracted from the readme with certain tags at the end of the read me if not found the age field should be ignored in the post or put command 
+
+TAGS: javascript, automation, github-actions
