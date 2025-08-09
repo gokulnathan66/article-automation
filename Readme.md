@@ -1,4 +1,4 @@
-# Article Automation for gokul
+# Article Automation for success test post 
 
 This project automates the process of synchronizing content between GitHub README files and various blogging platforms.
 
