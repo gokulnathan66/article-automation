@@ -12,6 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Load repo variables into env at the start
       - name: Load saved post variables as env
         run: |
           echo "SAVED_POST_ID=${{ vars.SAVED_POST_ID }}" >> $GITHUB_ENV
@@ -57,10 +58,12 @@ jobs:
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
 
-      - name: Save post details to repo variables
+      - name: Save post details to repo variables (requires PAT)
         run: |
-          # If post JSON had no error, update repo variables
           if jq -e 'has("error") | not' post_output.json; then
+            echo "Updating GitHub repository variables..."
+
+            # ID
             gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_ID \
               -f name="SAVED_POST_ID" \
               -f value="$(jq -r '.id' post_output.json)" || \
@@ -68,6 +71,7 @@ jobs:
               -f name="SAVED_POST_ID" \
               -f value="$(jq -r '.id' post_output.json)"
 
+            # TITLE
             gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_TITLE \
               -f name="SAVED_POST_TITLE" \
               -f value="$(jq -r '.title' post_output.json)" || \
@@ -75,6 +79,7 @@ jobs:
               -f name="SAVED_POST_TITLE" \
               -f value="$(jq -r '.title' post_output.json)"
 
+            # URL
             gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_URL \
               -f name="SAVED_POST_URL" \
               -f value="$(jq -r '.url' post_output.json)" || \
@@ -82,6 +87,7 @@ jobs:
               -f name="SAVED_POST_URL" \
               -f value="$(jq -r '.url' post_output.json)"
 
+            # PUBLISHED_AT
             gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_PUBLISHED_AT \
               -f name="SAVED_POST_PUBLISHED_AT" \
               -f value="$(jq -r '.published_at' post_output.json)" || \
@@ -89,6 +95,7 @@ jobs:
               -f name="SAVED_POST_PUBLISHED_AT" \
               -f value="$(jq -r '.published_at' post_output.json)"
 
+            # UPDATED_AT
             gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_UPDATED_AT \
               -f name="SAVED_POST_UPDATED_AT" \
               -f value="$(jq -r '.updated_at' post_output.json)" || \
@@ -99,7 +106,7 @@ jobs:
             echo "Skipped saving repo variables due to errors."
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # ✅ Use your PAT here
 
       - name: Show post info
         run: |
