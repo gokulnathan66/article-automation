@@ -27,29 +27,29 @@ async function getReadmeData() {
   let readmePath = null;
   let content = null;
 
-  // Debug: show current working directory and list files
-  console.log("Current working directory:", process.cwd());
+  // Debug: show current working directory and list files (use stderr to avoid polluting JSON output)
+  console.error("Current working directory:", process.cwd());
   const rootDir = path.resolve(__dirname, '..');
-  console.log("Looking for README in directory:", rootDir);
+  console.error("Looking for README in directory:", rootDir);
   
   try {
     const files = await fs.readdir(rootDir);
-    console.log("Files in root directory:", files);
+    console.error("Files in root directory:", files);
   } catch (error) {
-    console.log("Could not list root directory:", error.message);
+    console.error("Could not list root directory:", error.message);
   }
 
   // Try to find the README file with different case variations
   for (const filename of possibleReadmeFiles) {
     const testPath = path.resolve(__dirname, '..', filename);
     try {
-      console.log("Trying to read:", testPath);
+      console.error("Trying to read:", testPath);
       content = await fs.readFile(testPath, 'utf-8');
       readmePath = testPath;
-      console.log("Successfully found README at:", readmePath);
+      console.error("Successfully found README at:", readmePath);
       break;
     } catch (error) {
-      console.log(`File ${filename} not found, trying next...`);
+      console.error(`File ${filename} not found, trying next...`);
     }
   }
 
@@ -104,8 +104,22 @@ async function postOrUpdateArticle() {
     };
     console.log(JSON.stringify(postDetails));
   } else {
+    // Log error details to stderr for debugging
     console.error('Error posting/updating article:', data);
-    process.exit(1); // Fail workflow step
+    
+    // Output error details as JSON to stdout so workflow can still parse it
+    const errorDetails = {
+      error: true,
+      message: data.error || 'Unknown error',
+      status: response.status,
+      id: null,
+      title: null,
+      url: null,
+      published_at: null,
+      updated_at: null
+    };
+    console.log(JSON.stringify(errorDetails));
+    process.exit(1); // Still fail the workflow step
   }
 }
 

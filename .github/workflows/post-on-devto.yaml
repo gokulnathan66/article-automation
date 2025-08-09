@@ -31,14 +31,28 @@ jobs:
       - name: Run post script and set env variables
         run: |
           # Run Node.js script, output JSON metadata to a temp file
+          # Debug output goes to stderr, JSON output goes to stdout
           node api/post.js > post_output.json
 
-          # Export fields from output as environment variables
-          echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
-          echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
-          echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
-          echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
-          echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
+          # Show the actual output for debugging
+          echo "Script output:"
+          cat post_output.json
+          
+          # Verify JSON is valid before parsing
+          if jq empty post_output.json 2>/dev/null; then
+            echo "JSON is valid, extracting fields..."
+            # Export fields from output as environment variables
+            echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
+            echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
+            echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
+            echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
+            echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
+          else
+            echo "Error: Output is not valid JSON"
+            echo "Raw output:"
+            cat post_output.json
+            exit 1
+          fi
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
 
