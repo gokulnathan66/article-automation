@@ -1,4 +1,4 @@
-# Article Automation - renamed readme
+# Article Automation for gokul
 
 This project automates the process of synchronizing content between GitHub README files and various blogging platforms.
 
