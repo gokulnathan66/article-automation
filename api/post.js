@@ -1,20 +1,26 @@
-import fs from 'fs/promises';
 import path from 'path';
+import fs from 'fs/promises';
 import 'dotenv/config';
 
-const savedPostFile = path.join(process.cwd(), 'savedPost.json');
+// Removed savedPostFile and related file read/write functions,
+// because we won't use savedPost.json anymore.
 
-async function savePostDetails(data) {
-  await fs.writeFile(savedPostFile, JSON.stringify(data, null, 2), 'utf-8');
-}
+// You can optionally keep this if you want to read from a local file outside GitHub Actions,
+// but in the GitHub Actions context, you should rely on env vars instead.
 
-async function getSavedPostDetails() {
-  try {
-    const data = await fs.readFile(savedPostFile, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    return null; // No saved post yet
+async function getSavedPostDetailsFromEnv() {
+  // Read saved post details from environment variables if set
+  // (This makes your script flexible to run locally with file, or in CI with env)
+  if (process.env.SAVED_POST_ID) {
+    return {
+      id: process.env.SAVED_POST_ID,
+      title: process.env.SAVED_POST_TITLE,
+      url: process.env.SAVED_POST_URL,
+      published_at: process.env.SAVED_POST_PUBLISHED_AT,
+      updated_at: process.env.SAVED_POST_UPDATED_AT,
+    };
   }
+  return null;
 }
 
 async function getReadmeData() {
@@ -30,7 +36,15 @@ async function getReadmeData() {
 }
 
 async function postOrUpdateArticle() {
-  const savedPost = await getSavedPostDetails();
+  // Try to read from env first (for GitHub Actions)
+  const savedPost = await getSavedPostDetailsFromEnv();
+
+  // Or fallback to reading from json file (for local testing)
+  // Comment this out if you want to disable file usage
+  // if (!savedPost) {
+  //   savedPost = await getSavedPostDetailsFromFile();
+  // }
+
   const { title, body } = await getReadmeData();
 
   const method = savedPost ? 'PUT' : 'POST';
@@ -49,7 +63,7 @@ async function postOrUpdateArticle() {
         title,
         body_markdown: body,
         published: true,
-        tags: ['tag1', 'tag2'], // Optionally extend to auto-extract tags later
+        tags: ['tag1', 'tag2'], // Optional: you can enhance tag extraction
       },
     }),
   });
@@ -57,19 +71,23 @@ async function postOrUpdateArticle() {
   const data = await response.json();
 
   if (response.ok) {
-    // Save post details if published successfully
-    await savePostDetails({
+    // Instead of saving to a file, output JSON to stdout for GitHub Actions
+    const postDetails = {
       id: data.id,
       title: data.title,
       url: data.url,
       published_at: data.published_at,
       updated_at: data.edited_at,
-    });
-    console.log(`Article ${method === 'POST' ? 'created' : 'updated'} successfully!`);
-    console.log('Post URL:', data.url);
+    };
+
+    console.log(JSON.stringify(postDetails));
   } else {
     console.error('Error posting/updating article:', data);
+    process.exit(1);
   }
 }
 
-postOrUpdateArticle().catch(console.error);
+postOrUpdateArticle().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
