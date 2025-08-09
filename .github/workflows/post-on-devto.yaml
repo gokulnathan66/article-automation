@@ -12,20 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Restore saved post env
-        id: load_saved_post_env
+      - name: Load saved post variables as env
         run: |
-          # If .env.SAVED_POST exists, source it
-          if [[ -f .env.SAVED_POST ]]; then
-            echo "Loading saved post env:"
-            cat .env.SAVED_POST
-            set -a
-            source .env.SAVED_POST
-            set +a
-          else
-            echo "No previous saved post env found."
-          fi
-        shell: bash
+          echo "SAVED_POST_ID=${{ vars.SAVED_POST_ID }}" >> $GITHUB_ENV
+          echo "SAVED_POST_TITLE=${{ vars.SAVED_POST_TITLE }}" >> $GITHUB_ENV
+          echo "SAVED_POST_URL=${{ vars.SAVED_POST_URL }}" >> $GITHUB_ENV
+          echo "SAVED_POST_PUBLISHED_AT=${{ vars.SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
+          echo "SAVED_POST_UPDATED_AT=${{ vars.SAVED_POST_UPDATED_AT }}" >> $GITHUB_ENV
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -44,13 +37,6 @@ jobs:
       - name: Run post script and capture output
         id: run_post
         run: |
-          # Export env vars if they exist (for update)
-          export SAVED_POST_ID="${SAVED_POST_ID:-}"
-          export SAVED_POST_TITLE="${SAVED_POST_TITLE:-}"
-          export SAVED_POST_URL="${SAVED_POST_URL:-}"
-          export SAVED_POST_PUBLISHED_AT="${SAVED_POST_PUBLISHED_AT:-}"
-          export SAVED_POST_UPDATED_AT="${SAVED_POST_UPDATED_AT:-}"
-
           node api/post.js > post_output.json
 
           echo "Script output:"
@@ -63,13 +49,6 @@ jobs:
             echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
-
-            # Save for future workflows (commit if changed)
-            echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" > .env.SAVED_POST
-            echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> .env.SAVED_POST
-            echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> .env.SAVED_POST
-            echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> .env.SAVED_POST
-            echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> .env.SAVED_POST
           else
             echo "Error: Output is not valid JSON"
             cat post_output.json
@@ -78,15 +57,49 @@ jobs:
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
 
-      - name: Commit updated env file
+      - name: Save post details to repo variables
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          if [[ -f .env.SAVED_POST ]]; then
-            git add .env.SAVED_POST
-            git diff --cached --quiet .env.SAVED_POST || git commit -m "Update Dev.to post env"
-            git push
+          # If post JSON had no error, update repo variables
+          if jq -e 'has("error") | not' post_output.json; then
+            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_ID \
+              -f name="SAVED_POST_ID" \
+              -f value="$(jq -r '.id' post_output.json)" || \
+            gh api --method POST /repos/${{ github.repository }}/actions/variables \
+              -f name="SAVED_POST_ID" \
+              -f value="$(jq -r '.id' post_output.json)"
+
+            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_TITLE \
+              -f name="SAVED_POST_TITLE" \
+              -f value="$(jq -r '.title' post_output.json)" || \
+            gh api --method POST /repos/${{ github.repository }}/actions/variables \
+              -f name="SAVED_POST_TITLE" \
+              -f value="$(jq -r '.title' post_output.json)"
+
+            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_URL \
+              -f name="SAVED_POST_URL" \
+              -f value="$(jq -r '.url' post_output.json)" || \
+            gh api --method POST /repos/${{ github.repository }}/actions/variables \
+              -f name="SAVED_POST_URL" \
+              -f value="$(jq -r '.url' post_output.json)"
+
+            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_PUBLISHED_AT \
+              -f name="SAVED_POST_PUBLISHED_AT" \
+              -f value="$(jq -r '.published_at' post_output.json)" || \
+            gh api --method POST /repos/${{ github.repository }}/actions/variables \
+              -f name="SAVED_POST_PUBLISHED_AT" \
+              -f value="$(jq -r '.published_at' post_output.json)"
+
+            gh api --method PATCH /repos/${{ github.repository }}/actions/variables/SAVED_POST_UPDATED_AT \
+              -f name="SAVED_POST_UPDATED_AT" \
+              -f value="$(jq -r '.updated_at' post_output.json)" || \
+            gh api --method POST /repos/${{ github.repository }}/actions/variables \
+              -f name="SAVED_POST_UPDATED_AT" \
+              -f value="$(jq -r '.updated_at' post_output.json)"
+          else
+            echo "Skipped saving repo variables due to errors."
           fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show post info
         run: |

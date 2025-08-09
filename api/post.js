@@ -3,11 +3,10 @@ import fs from 'fs/promises';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 
-// --- ES module __dirname support ---
+// ES Modules __dirname support
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Utility: Try multiple README file names ---
 async function getReadmeData() {
   const rootDir = path.resolve(__dirname, '..');
   const possibleFiles = ['README.md', 'Readme.md', 'readme.md'];
@@ -24,7 +23,6 @@ async function getReadmeData() {
   throw new Error(`README file not found. Searched: ${possibleFiles.join(', ')}`);
 }
 
-// --- Core logic: Post or update ---
 export async function postOrUpdateArticle({ existingEnv }) {
   const { title, body } = await getReadmeData();
 
@@ -61,10 +59,9 @@ export async function postOrUpdateArticle({ existingEnv }) {
       updated_at: data.edited_at,
       method,
     };
-    console.log(JSON.stringify(postDetails)); // for workflow step
+    console.log(JSON.stringify(postDetails));
     return postDetails;
   } else {
-    // Error output for debugging and workflow
     const errorDetails = {
       error: true,
       message: data.error || response.statusText || 'Unknown error',
@@ -77,9 +74,7 @@ export async function postOrUpdateArticle({ existingEnv }) {
   }
 }
 
-// --- Entrypoint: Reads current env vars if present ---
 async function main() {
-  // Try to read env variables (for update path)
   const envVars = {
     id: process.env.SAVED_POST_ID,
     title: process.env.SAVED_POST_TITLE,
@@ -87,7 +82,6 @@ async function main() {
     published_at: process.env.SAVED_POST_PUBLISHED_AT,
     updated_at: process.env.SAVED_POST_UPDATED_AT,
   };
-  // Only pass non-null if id is present
   const existingEnv = envVars.id ? envVars : null;
   await postOrUpdateArticle({ existingEnv });
 }
