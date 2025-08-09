@@ -1,8 +1,8 @@
 name: Post on Dev.to
 
-on:
-  push:
-    branches: [main]  # Trigger on pushes to 'main' branch
+# on:
+#   push:
+#     branches: [main]  # Trigger on pushes to 'main' branch
 
 jobs:
   post-on-devto:

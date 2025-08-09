@@ -53,3 +53,7 @@ the tags need to be extracted from the readme with certain tags at the end of th
 
 TAGS: javascript, automation, githubactions 
     no non numerical vlaue no ` - in the tags `
+
+
+Next is linkedin article automation. 
+
