@@ -1,4 +1,4 @@
-# Article Automation - test
+# Article Automation - renamed readme
 
 This project automates the process of synchronizing content between GitHub README files and various blogging platforms.
 
