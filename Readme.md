@@ -51,4 +51,5 @@ Next platform to be integrated
 
 the tags need to be extracted from the readme with certain tags at the end of the read me if not found the age field should be ignored in the post or put command 
 
-TAGS: javascript, automation, githubactions
+TAGS: javascript, automation, githubactions 
+    no non numerical vlaue no ` - in the tags `
