@@ -1,16 +1,14 @@
 import path from 'path';
 import fs from 'fs/promises';
 import 'dotenv/config';
+import { fileURLToPath } from 'url';
 
-// Removed savedPostFile and related file read/write functions,
-// because we won't use savedPost.json anymore.
+// Fix for ES modules: get __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// You can optionally keep this if you want to read from a local file outside GitHub Actions,
-// but in the GitHub Actions context, you should rely on env vars instead.
-
+// Optionally, allow loading saved post from env (for "update" capability)
 async function getSavedPostDetailsFromEnv() {
-  // Read saved post details from environment variables if set
-  // (This makes your script flexible to run locally with file, or in CI with env)
   if (process.env.SAVED_POST_ID) {
     return {
       id: process.env.SAVED_POST_ID,
@@ -24,8 +22,9 @@ async function getSavedPostDetailsFromEnv() {
 }
 
 async function getReadmeData() {
-    const readmePath = path.resolve(__dirname, '..', 'README.md');
-    const content = await fs.readFile(readmePath, 'utf-8');
+  const readmePath = path.resolve(__dirname, '..', 'README.md');
+  console.log("Reading README from:", readmePath);
+  const content = await fs.readFile(readmePath, 'utf-8');
 
   const lines = content.split('\n');
   const titleLine = lines.find(line => line.startsWith('# '));
@@ -36,15 +35,8 @@ async function getReadmeData() {
 }
 
 async function postOrUpdateArticle() {
-  // Try to read from env first (for GitHub Actions)
+  // Try to get existing post data from environment
   const savedPost = await getSavedPostDetailsFromEnv();
-
-  // Or fallback to reading from json file (for local testing)
-  // Comment this out if you want to disable file usage
-  // if (!savedPost) {
-  //   savedPost = await getSavedPostDetailsFromFile();
-  // }
-
   const { title, body } = await getReadmeData();
 
   const method = savedPost ? 'PUT' : 'POST';
@@ -63,7 +55,7 @@ async function postOrUpdateArticle() {
         title,
         body_markdown: body,
         published: true,
-        tags: ['tag1', 'tag2'], // Optional: you can enhance tag extraction
+        tags: ['tag1', 'tag2'], // You can customize/extract tags if needed
       },
     }),
   });
@@ -71,7 +63,7 @@ async function postOrUpdateArticle() {
   const data = await response.json();
 
   if (response.ok) {
-    // Instead of saving to a file, output JSON to stdout for GitHub Actions
+    // Output post details as JSON for the workflow to read and export
     const postDetails = {
       id: data.id,
       title: data.title,
@@ -79,15 +71,14 @@ async function postOrUpdateArticle() {
       published_at: data.published_at,
       updated_at: data.edited_at,
     };
-
     console.log(JSON.stringify(postDetails));
   } else {
     console.error('Error posting/updating article:', data);
-    process.exit(1);
+    process.exit(1); // Fail workflow step
   }
 }
 
 postOrUpdateArticle().catch(error => {
   console.error(error);
-  process.exit(1);
+  process.exit(1); // Fail workflow step
 });

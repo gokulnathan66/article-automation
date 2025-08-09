@@ -22,22 +22,21 @@ jobs:
 
       - name: Run post script and set env variables
         run: |
-          # Run the Node.js script and save JSON output to a temporary file
+          # Run Node.js script, output JSON metadata to a temp file
           node api/post.js > post_output.json
 
-          # Use jq to parse JSON and export details as GitHub Actions environment variables
+          # Export fields from output as environment variables
           echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
           echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
           echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
           echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
           echo "SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
-
         env:
           DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
 
-      - name: Use saved post info
+      - name: Show post info
         run: |
-          echo "Article posted/updated successfully!"
+          echo "Article posted/updated."
           echo "ID: $SAVED_POST_ID"
           echo "Title: $SAVED_POST_TITLE"
           echo "URL: $SAVED_POST_URL"
