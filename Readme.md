@@ -247,7 +247,8 @@ console.log("Hello, World!");
 ```
 
 <!-- Add tags at the end (optional) -->
-Tags: javascript, tutorial, webdev, github-actions
+Tags: javascript, tutorial, webdev, githubactions 
+Tag "github-actions" contains non-alphanumeric or prohibited unicode characters
 ```
 
 > **Important**: Tags should be added at the end of your content using the format `Tags: tag1, tag2, tag3`. Avoid non-alphanumeric characters in tags.
