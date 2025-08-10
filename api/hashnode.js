@@ -93,7 +93,7 @@ async function makeHashnodeRequest(query, variables = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': process.env.HASHNODE_PAT, // Personal Access Token
+      'Authorization': process.env.HASHNODE_PAT,
     },
     body: JSON.stringify({
       query,
@@ -104,10 +104,106 @@ async function makeHashnodeRequest(query, variables = {}) {
   const result = await response.json();
   
   if (result.errors) {
+    console.error('GraphQL Errors:', JSON.stringify(result.errors, null, 2));
     throw new Error(`GraphQL Error: ${JSON.stringify(result.errors)}`);
   }
   
   return result.data;
+}
+
+/**
+ * Gets all posts from the publication to find existing post by title
+ */
+async function findExistingPostByTitle(title) {
+  const query = `
+    query GetPosts($host: String!, $first: Int!) {
+      publication(host: $host) {
+        posts(first: $first) {
+          edges {
+            node {
+              id
+              slug
+              title
+              url
+              publishedAt
+              updatedAt
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    host: process.env.HASHNODE_PUBLICATION_HOST,
+    first: 50, // Adjust based on how many posts you might have
+  };
+
+  try {
+    console.error(`Searching for existing post with title: "${title}"`);
+    const data = await makeHashnodeRequest(query, variables);
+    
+    if (!data.publication) {
+      console.error(`Publication not found for host: ${process.env.HASHNODE_PUBLICATION_HOST}`);
+      return null;
+    }
+
+    const posts = data.publication.posts.edges.map(edge => edge.node);
+    const existingPost = posts.find(post => post.title.trim() === title.trim());
+    
+    if (existingPost) {
+      console.error(`Found existing post: ${existingPost.id} - "${existingPost.title}"`);
+    } else {
+      console.error('No existing post found with matching title');
+    }
+    
+    return existingPost;
+  } catch (error) {
+    console.error('Error searching for existing post:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Gets post details by slug
+ */
+async function getPostBySlug(slug) {
+  const query = `
+    query GetPost($slug: String!, $host: String!) {
+      publication(host: $host) {
+        post(slug: $slug) {
+          id
+          slug
+          title
+          url
+          publishedAt
+          updatedAt
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    slug,
+    host: process.env.HASHNODE_PUBLICATION_HOST,
+  };
+
+  try {
+    console.error(`Searching for existing post with slug: "${slug}"`);
+    const data = await makeHashnodeRequest(query, variables);
+    
+    const post = data.publication?.post;
+    if (post) {
+      console.error(`Found existing post by slug: ${post.id} - "${post.title}"`);
+    } else {
+      console.error('No existing post found with matching slug');
+    }
+    
+    return post;
+  } catch (error) {
+    console.error('Error searching by slug:', error.message);
+    return null;
+  }
 }
 
 /**
@@ -187,38 +283,6 @@ async function updateExistingArticle(postId, title, content, tags) {
 }
 
 /**
- * Gets post details by slug or title to check if it exists
- */
-async function getPostBySlug(slug) {
-  const query = `
-    query GetPost($slug: String!, $host: String!) {
-      publication(host: $host) {
-        post(slug: $slug) {
-          id
-          slug
-          title
-          url
-          publishedAt
-          updatedAt
-        }
-      }
-    }
-  `;
-
-  const variables = {
-    slug,
-    host: process.env.HASHNODE_PUBLICATION_HOST, // e.g., "yourblog.hashnode.dev"
-  };
-
-  try {
-    const data = await makeHashnodeRequest(query, variables);
-    return data.publication?.post || null;
-  } catch (error) {
-    return null; // Post doesn't exist
-  }
-}
-
-/**
  * Creates a slug from title
  */
 function createSlug(title) {
@@ -230,6 +294,14 @@ function createSlug(title) {
     .trim('-');
 }
 
+/**
+ * Validates if an ID looks like a Hashnode post ID
+ */
+function isValidHashnodeId(id) {
+  // Hashnode IDs are typically 24-character MongoDB ObjectIds
+  return id && id.length >= 20 && /^[a-zA-Z0-9]+$/.test(id);
+}
+
 export async function postOrUpdateArticle({ existingEnv }) {
   const { title, body, tags } = await getReadmeData();
   const slug = createSlug(title);
@@ -237,12 +309,28 @@ export async function postOrUpdateArticle({ existingEnv }) {
   let isUpdating = false;
   let existingPost = null;
 
-  // Check if we have an existing post ID from environment
-  if (existingEnv?.id) {
+  console.error(`Processing article: "${title}"`);
+  console.error(`Generated slug: "${slug}"`);
+
+  // Strategy 1: Check if we have a VALID Hashnode post ID from environment
+  if (existingEnv?.id && isValidHashnodeId(existingEnv.id)) {
+    console.error(`Using saved Hashnode post ID: ${existingEnv.id}`);
     isUpdating = true;
     existingPost = { id: existingEnv.id };
-  } else {
-    // Try to find existing post by slug
+  } else if (existingEnv?.id) {
+    console.error(`Saved ID (${existingEnv.id}) appears to be from another platform, ignoring...`);
+  }
+
+  // Strategy 2: Try to find existing post by title (more reliable)
+  if (!existingPost) {
+    existingPost = await findExistingPostByTitle(title);
+    if (existingPost) {
+      isUpdating = true;
+    }
+  }
+
+  // Strategy 3: If title search fails, try slug search
+  if (!existingPost) {
     existingPost = await getPostBySlug(slug);
     if (existingPost) {
       isUpdating = true;
@@ -253,10 +341,10 @@ export async function postOrUpdateArticle({ existingEnv }) {
 
   try {
     if (isUpdating && existingPost) {
-      console.log(`Updating existing post: ${existingPost.id}`);
+      console.error(`Updating existing post: ${existingPost.id}`);
       postResult = await updateExistingArticle(existingPost.id, title, body, tags);
     } else {
-      console.log('Publishing new post');
+      console.error('Publishing new post');
       postResult = await publishNewArticle(title, body, tags);
     }
 
@@ -270,6 +358,7 @@ export async function postOrUpdateArticle({ existingEnv }) {
       method: isUpdating ? 'UPDATE' : 'POST',
     };
 
+    // ONLY output the JSON to stdout - this is what gets parsed by GitHub Actions
     console.log(JSON.stringify(postDetails));
     return postDetails;
 
@@ -280,6 +369,7 @@ export async function postOrUpdateArticle({ existingEnv }) {
       ...existingEnv,
     };
     console.error('Error posting/updating:', errorDetails.message);
+    // Output error as JSON to stdout for GitHub Actions to parse
     console.log(JSON.stringify(errorDetails));
     process.exit(1);
   }
@@ -287,25 +377,40 @@ export async function postOrUpdateArticle({ existingEnv }) {
 
 async function main() {
   // Validate required environment variables
-  if (!process.env.HASHNODE_PAT) {
-    throw new Error('HASHNODE_PAT environment variable is required');
-  }
-  if (!process.env.HASHNODE_PUBLICATION_ID) {
-    throw new Error('HASHNODE_PUBLICATION_ID environment variable is required');
-  }
-  if (!process.env.HASHNODE_PUBLICATION_HOST) {
-    throw new Error('HASHNODE_PUBLICATION_HOST environment variable is required');
+  const requiredVars = [
+    'HASHNODE_PAT',
+    'HASHNODE_PUBLICATION_ID',
+    'HASHNODE_PUBLICATION_HOST'
+  ];
+
+  for (const varName of requiredVars) {
+    if (!process.env[varName]) {
+      throw new Error(`${varName} environment variable is required`);
+    }
   }
 
+  console.error('Environment check:');
+  console.error(`- HASHNODE_PUBLICATION_HOST: ${process.env.HASHNODE_PUBLICATION_HOST}`);
+  console.error(`- HASHNODE_PUBLICATION_ID: ${process.env.HASHNODE_PUBLICATION_ID}`);
+  console.error(`- HASHNODE_PAT: ${process.env.HASHNODE_PAT ? 'Set' : 'Not set'}`);
+
   const envVars = {
-    id: process.env.SAVED_POST_ID,
-    slug: process.env.SAVED_POST_SLUG,
-    title: process.env.SAVED_POST_TITLE,
-    url: process.env.SAVED_POST_URL,
-    published_at: process.env.SAVED_POST_PUBLISHED_AT,
-    updated_at: process.env.SAVED_POST_UPDATED_AT,
+    id: process.env.HASHNODE_SAVED_POST_ID,
+    slug: process.env.HASHNODE_SAVED_POST_SLUG,
+    title: process.env.HASHNODE_SAVED_POST_TITLE,
+    url: process.env.HASHNODE_SAVED_POST_URL,
+    published_at: process.env.HASHNODE_SAVED_POST_PUBLISHED_AT,
+    updated_at: process.env.HASHNODE_SAVED_POST_UPDATED_AT,
   };
+  
   const existingEnv = envVars.id ? envVars : null;
+  
+  if (existingEnv) {
+    console.error('Found saved post data:', existingEnv);
+  } else {
+    console.error('No saved post data found, will check for existing posts by title/slug');
+  }
+  
   await postOrUpdateArticle({ existingEnv });
 }
 

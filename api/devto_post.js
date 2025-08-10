@@ -141,11 +141,11 @@ export async function postOrUpdateArticle({ existingEnv }) {
 
 async function main() {
   const envVars = {
-    id: process.env.SAVED_POST_ID,
-    title: process.env.SAVED_POST_TITLE,
-    url: process.env.SAVED_POST_URL,
-    published_at: process.env.SAVED_POST_PUBLISHED_AT,
-    updated_at: process.env.SAVED_POST_UPDATED_AT,
+    id: process.env.DEV_TO_SAVED_POST_ID,
+    title: process.env.DEV_TO_SAVED_POST_TITLE,
+    url: process.env.DEV_TO_SAVED_POST_URL,
+    published_at: process.env.DEV_TO_SAVED_POST_PUBLISHED_AT,
+    updated_at: process.env.DEV_TO_SAVED_POST_UPDATED_AT,
   };
   const existingEnv = envVars.id ? envVars : null;
   await postOrUpdateArticle({ existingEnv });
