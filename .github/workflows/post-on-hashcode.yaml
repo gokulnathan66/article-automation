@@ -47,8 +47,9 @@ jobs:
         run: |
           node api/hashnode.js > post_output.json
 
-          echo "Script output:"
-          cat post_output.json
+          # Uncomment for debugging:
+          # echo "Script output:"
+          # cat post_output.json
 
           if jq empty post_output.json 2>/dev/null; then
             echo "JSON is valid, extracting fields..."
@@ -89,6 +90,8 @@ jobs:
 
             for var in "${!variables[@]}"; do
               VALUE="${variables[$var]}"
+              
+              # Uncomment for debugging:
               # echo "Setting $var to: $VALUE"
               
               # Try to update existing variable, create if it doesn't exist
@@ -99,6 +102,8 @@ jobs:
                 -f name="$var" \
                 -f value="$VALUE"
             done
+            
+            echo "✅ Repository variables updated successfully."
           else
             echo "⏭ Skipped saving repo variables due to errors."
           fi
@@ -106,12 +111,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
 
       # 8️⃣ Final output
-      - name: Show post info
+      - name: Show post status
         run: |
-          echo "📢 Article posted/updated on Hashnode."
+          echo "📢 Article processing completed on Hashnode."
+          
+          # Uncomment for debugging:
           # echo "ID: $HASHNODE_SAVED_POST_ID"
-          echo "Slug: $HASHNODE_SAVED_POST_SLUG"  
-          echo "Title: $HASHNODE_SAVED_POST_TITLE"
-          echo "URL: $HASHNODE_SAVED_POST_URL"
+          # echo "Slug: $HASHNODE_SAVED_POST_SLUG"  
+          # echo "Title: $HASHNODE_SAVED_POST_TITLE"
+          # echo "URL: $HASHNODE_SAVED_POST_URL"
           # echo "Published At: $HASHNODE_SAVED_POST_PUBLISHED_AT"
           # echo "Updated At: $HASHNODE_SAVED_POST_UPDATED_AT"

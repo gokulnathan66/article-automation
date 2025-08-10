@@ -45,8 +45,9 @@ jobs:
         run: |
           node api/devto_post.js > post_output.json
 
-          echo "Script output:"
-          cat post_output.json
+          # Uncomment for debugging:
+          # echo "Script output:"
+          # cat post_output.json
 
           if jq empty post_output.json 2>/dev/null; then
             echo "JSON is valid, extracting fields..."
@@ -72,21 +73,31 @@ jobs:
           if jq -e 'has("error") | not' post_output.json; then
             echo "✅ Updating GitHub repository variables..."
 
-            for var in DEV_TO_SAVED_POST_ID DEV_TO_SAVED_POST_TITLE DEV_TO_SAVED_POST_URL DEV_TO_SAVED_POST_PUBLISHED_AT DEV_TO_SAVED_POST_UPDATED_AT
-            do
-              VALUE=$(jq -r '.id' post_output.json)
-              if [ "$var" = "DEV_TO_SAVED_POST_TITLE" ]; then VALUE=$(jq -r '.title' post_output.json); fi
-              if [ "$var" = "DEV_TO_SAVED_POST_URL" ]; then VALUE=$(jq -r '.url' post_output.json); fi
-              if [ "$var" = "DEV_TO_SAVED_POST_PUBLISHED_AT" ]; then VALUE=$(jq -r '.published_at' post_output.json); fi
-              if [ "$var" = "DEV_TO_SAVED_POST_UPDATED_AT" ]; then VALUE=$(jq -r '.updated_at' post_output.json); fi
+            # Save all variables with improved error handling
+            declare -A variables=(
+              ["DEV_TO_SAVED_POST_ID"]=$(jq -r '.id' post_output.json)
+              ["DEV_TO_SAVED_POST_TITLE"]=$(jq -r '.title' post_output.json)
+              ["DEV_TO_SAVED_POST_URL"]=$(jq -r '.url' post_output.json)
+              ["DEV_TO_SAVED_POST_PUBLISHED_AT"]=$(jq -r '.published_at' post_output.json)
+              ["DEV_TO_SAVED_POST_UPDATED_AT"]=$(jq -r '.updated_at' post_output.json)
+            )
 
+            for var in "${!variables[@]}"; do
+              VALUE="${variables[$var]}"
+              
+              # Uncomment for debugging:
+              # echo "Setting $var to: $VALUE"
+              
+              # Try to update existing variable, create if it doesn't exist
               gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
                 -f name="$var" \
-                -f value="$VALUE" || \
+                -f value="$VALUE" 2>/dev/null || \
               gh api --method POST /repos/${{ github.repository }}/actions/variables \
                 -f name="$var" \
                 -f value="$VALUE"
             done
+            
+            echo "✅ Repository variables updated successfully."
           else
             echo "⏭ Skipped saving repo variables due to errors."
           fi
@@ -94,11 +105,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # 🔑 User-provided PAT with repo + actions:write
 
       # 8️⃣ Final output
-      - name: Show post info
+      - name: Show post status
         run: |
-          echo "📢 Article posted/updated."
+          echo "📢 Article processing completed on Dev.to."
+          
+          # Uncomment for debugging:
           # echo "ID: $DEV_TO_SAVED_POST_ID"
-          echo "Title: $DEV_TO_SAVED_POST_TITLE"
-          echo "URL: $DEV_TO_SAVED_POST_URL"
+          # echo "Title: $DEV_TO_SAVED_POST_TITLE"
+          # echo "URL: $DEV_TO_SAVED_POST_URL"
           # echo "Published At: $DEV_TO_SAVED_POST_PUBLISHED_AT"
           # echo "Updated At: $DEV_TO_SAVED_POST_UPDATED_AT"
