@@ -20,6 +20,27 @@ inputs:
     description: 'Path to the content/markdown files in user repo'
     required: false
     default: 'content'
+  # Add inputs for saved post data
+  saved-post-id:
+    description: 'Previously saved Dev.to post ID'
+    required: false
+    default: ''
+  saved-post-title:
+    description: 'Previously saved Dev.to post title'
+    required: false
+    default: ''
+  saved-post-url:
+    description: 'Previously saved Dev.to post URL'
+    required: false
+    default: ''
+  saved-post-published-at:
+    description: 'Previously saved Dev.to post published date'
+    required: false
+    default: ''
+  saved-post-updated-at:
+    description: 'Previously saved Dev.to post updated date'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -27,7 +48,7 @@ runs:
     - name: Checkout action repository
       uses: actions/checkout@v4
       with:
-        repository: ${{ github.action_repository }}
+        repository: gokulnathan66/article-automation
         path: action-repo
         
     - name: Set up Node.js
@@ -48,14 +69,14 @@ runs:
       
     - name: Process Dev.to article
       run: |
-        # Load saved variables silently
-        if [ -n "${{ vars.DEV_TO_SAVED_POST_ID }}" ]; then
-          export DEV_TO_SAVED_POST_ID="${{ vars.DEV_TO_SAVED_POST_ID }}"
-          export DEV_TO_SAVED_POST_TITLE="${{ vars.DEV_TO_SAVED_POST_TITLE }}"
-          export DEV_TO_SAVED_POST_URL="${{ vars.DEV_TO_SAVED_POST_URL }}"
-          export DEV_TO_SAVED_POST_PUBLISHED_AT="${{ vars.DEV_TO_SAVED_POST_PUBLISHED_AT }}"
-          export DEV_TO_SAVED_POST_UPDATED_AT="${{ vars.DEV_TO_SAVED_POST_UPDATED_AT }}"
-          echo "✅ Previous Dev.to post data loaded"
+        # Load saved variables from inputs
+        if [ -n "${{ inputs.saved-post-id }}" ]; then
+          export DEV_TO_SAVED_POST_ID="${{ inputs.saved-post-id }}"
+          export DEV_TO_SAVED_POST_TITLE="${{ inputs.saved-post-title }}"
+          export DEV_TO_SAVED_POST_URL="${{ inputs.saved-post-url }}"
+          export DEV_TO_SAVED_POST_PUBLISHED_AT="${{ inputs.saved-post-published-at }}"
+          export DEV_TO_SAVED_POST_UPDATED_AT="${{ inputs.saved-post-updated-at }}"
+          echo "✅ Previous Dev.to post data loaded from inputs"
         else
           echo "ℹ️ No previous Dev.to post data found"
         fi
@@ -64,10 +85,42 @@ runs:
         export USER_CONTENT_PATH="${{ inputs.content-path }}"
         export USER_REPO_PATH="$GITHUB_WORKSPACE"
         
+        # Debug: Show environment
+        echo "🔍 Debug Info:"
+        echo "- USER_REPO_PATH: $USER_REPO_PATH"
+        echo "- USER_CONTENT_PATH: $USER_CONTENT_PATH"
+        echo "- Current directory: $(pwd)"
+        echo "- User repo contents:"
+        ls -la "$USER_REPO_PATH" || echo "User repo path not found"
+        echo "- Content directory:"
+        ls -la "$USER_REPO_PATH/$USER_CONTENT_PATH" 2>/dev/null || echo "Content directory not found"
+        
         # Run script from action repository
         echo "🔄 Processing Dev.to article..."
         cd action-repo
-        node devto-publish/scripts/devto_post.js > ../devto_output.json 2>/dev/null
+        
+        # Check if script exists
+        if [ ! -f "devto-publish/scripts/devto_post.js" ]; then
+          echo "❌ Error: devto_post.js script not found!"
+          echo "Available files in action-repo:"
+          find . -name "*.js" -type f 2>/dev/null || echo "No JS files found"
+          exit 1
+        fi
+        
+        # Run script with error capture
+        echo "📝 Running Node.js script..."
+        if node devto-publish/scripts/devto_post.js > ../devto_output.json 2>../devto_script_error.log; then
+          echo "✅ Script executed successfully"
+        else
+          SCRIPT_EXIT_CODE=$?
+          echo "❌ Script execution failed with exit code: $SCRIPT_EXIT_CODE"
+          echo "Error output:"
+          cat ../devto_script_error.log 2>/dev/null || echo "No error log available"
+          echo "Script stdout:"
+          cat ../devto_output.json 2>/dev/null || echo "No output file generated"
+          exit $SCRIPT_EXIT_CODE
+        fi
+        
         cd ..
         
         # Validate and process JSON
@@ -108,12 +161,14 @@ runs:
           echo "🔗 Check your Dev.to dashboard for the published/updated article"
           
           # Clean up
-          rm -f devto_output.json
+          rm -f devto_output.json devto_script_error.log
           
         else
           echo "❌ Error: Invalid JSON output from Dev.to script"
           echo "Script output (for debugging):"
-          cat devto_output.json
+          cat devto_output.json 2>/dev/null || echo "No output file"
+          echo "Error log:"
+          cat devto_script_error.log 2>/dev/null || echo "No error log"
           exit 1
         fi
       shell: bash
