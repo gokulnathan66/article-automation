@@ -2,67 +2,87 @@ name: Auto publish on hashnode
 
 on:
   push:
-    branches: [main]  # Trigger on pushes to 'main' branch
-  workflow_dispatch:    # Allow manual triggers
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   post-on-hashnode:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code for access to README.md and script
+      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Load any previously saved repo variables into environment (silently)
-      - name: Load saved post variables as env
-        run: |
-          echo "HASHNODE_SAVED_POST_ID=${{ vars.HASHNODE_SAVED_POST_ID }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_SLUG=${{ vars.HASHNODE_SAVED_POST_SLUG }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_TITLE=${{ vars.HASHNODE_SAVED_POST_TITLE }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_URL=${{ vars.HASHNODE_SAVED_POST_URL }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_PUBLISHED_AT=${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_UPDATED_AT=${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}" >> $GITHUB_ENV
-          echo "✅ Post variables loaded from repository settings"
-
-      # 3️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 4️⃣ Install dependencies
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 5️⃣ Run your post/update script, output JSON (hidden from logs)
-      - name: Run Hashnode post script and capture output
-        id: run_post
+      # 4️⃣ Run script with complete privacy
+      - name: Process Hashnode article
         run: |
-          # Run script and capture output silently
+          # Load saved variables silently
+          if [ -n "${{ vars.HASHNODE_SAVED_POST_ID }}" ]; then
+            export HASHNODE_SAVED_POST_ID="${{ vars.HASHNODE_SAVED_POST_ID }}"
+            export HASHNODE_SAVED_POST_SLUG="${{ vars.HASHNODE_SAVED_POST_SLUG }}"
+            export HASHNODE_SAVED_POST_TITLE="${{ vars.HASHNODE_SAVED_POST_TITLE }}"
+            export HASHNODE_SAVED_POST_URL="${{ vars.HASHNODE_SAVED_POST_URL }}"
+            export HASHNODE_SAVED_POST_PUBLISHED_AT="${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}"
+            export HASHNODE_SAVED_POST_UPDATED_AT="${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}"
+            echo "✅ Previous post data loaded"
+          else
+            echo "ℹ️ No previous post data found"
+          fi
+          
+          # Run script silently
+          echo "🔄 Processing article..."
           node api/hashnode.js > post_output.json 2>/dev/null
-
+          
+          # Validate and process JSON
           if jq empty post_output.json 2>/dev/null; then
-            echo "✅ JSON output is valid, processing..."
-            # Extract fields silently (no echo to logs)
-            HASHNODE_SAVED_POST_ID=$(jq -r '.id' post_output.json)
-            HASHNODE_SAVED_POST_SLUG=$(jq -r '.slug' post_output.json)
-            HASHNODE_SAVED_POST_TITLE=$(jq -r '.title' post_output.json)
-            HASHNODE_SAVED_POST_URL=$(jq -r '.url' post_output.json)
-            HASHNODE_SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)
-            HASHNODE_SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)
+            echo "✅ Article processed successfully"
             
-            # Set environment variables silently
-            {
-              echo "HASHNODE_SAVED_POST_ID=$HASHNODE_SAVED_POST_ID"
-              echo "HASHNODE_SAVED_POST_SLUG=$HASHNODE_SAVED_POST_SLUG"
-              echo "HASHNODE_SAVED_POST_TITLE=$HASHNODE_SAVED_POST_TITLE"
-              echo "HASHNODE_SAVED_POST_URL=$HASHNODE_SAVED_POST_URL"
-              echo "HASHNODE_SAVED_POST_PUBLISHED_AT=$HASHNODE_SAVED_POST_PUBLISHED_AT"
-              echo "HASHNODE_SAVED_POST_UPDATED_AT=$HASHNODE_SAVED_POST_UPDATED_AT"
-            } >> $GITHUB_ENV
+            # Extract data silently
+            POST_ID=$(jq -r '.id' post_output.json)
+            POST_SLUG=$(jq -r '.slug' post_output.json)
+            POST_TITLE=$(jq -r '.title' post_output.json)
+            POST_URL=$(jq -r '.url' post_output.json)
+            POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)
+            POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)
             
-            echo "✅ Post data processed successfully"
+            # Save to repository variables silently
+            echo "💾 Updating repository variables..."
+            
+            VARS=(
+              "HASHNODE_SAVED_POST_ID:$POST_ID"
+              "HASHNODE_SAVED_POST_SLUG:$POST_SLUG"
+              "HASHNODE_SAVED_POST_TITLE:$POST_TITLE"
+              "HASHNODE_SAVED_POST_URL:$POST_URL"
+              "HASHNODE_SAVED_POST_PUBLISHED_AT:$POST_PUBLISHED_AT"
+              "HASHNODE_SAVED_POST_UPDATED_AT:$POST_UPDATED_AT"
+            )
+            
+            for var_pair in "${VARS[@]}"; do
+              VAR_NAME="${var_pair%%:*}"
+              VAR_VALUE="${var_pair#*:}"
+              
+              # Update or create variable silently
+              gh api --method PATCH "/repos/${{ github.repository }}/actions/variables/$VAR_NAME" \
+                -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1 || \
+              gh api --method POST "/repos/${{ github.repository }}/actions/variables" \
+                -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1
+            done
+            
+            echo "✅ Repository variables updated"
+            echo "📢 Article processing completed on Hashnode"
+            echo "🔗 Check your Hashnode dashboard for the published/updated article"
+            
           else
             echo "❌ Error: Invalid JSON output from script"
             echo "Script output (for debugging):"
@@ -76,42 +96,4 @@ jobs:
           GITHUB_USERNAME: ${{ github.repository_owner }}
           GITHUB_REPO: ${{ github.event.repository.name }}
           GITHUB_BRANCH: ${{ github.ref_name }}
-
-      # 6️⃣ Save details back into GitHub Repo Variables (silently)
-      - name: Save post details to repo variables
-        run: |
-          if jq -e 'has("error") | not' post_output.json >/dev/null 2>&1; then
-            echo "✅ Saving post details to repository variables..."
-            
-            # Variable names array
-            VARS=("HASHNODE_SAVED_POST_ID" "HASHNODE_SAVED_POST_SLUG" "HASHNODE_SAVED_POST_TITLE" "HASHNODE_SAVED_POST_URL" "HASHNODE_SAVED_POST_PUBLISHED_AT" "HASHNODE_SAVED_POST_UPDATED_AT")
-            
-            for var in "${VARS[@]}"; do
-              case $var in
-                "HASHNODE_SAVED_POST_ID") VALUE=$(jq -r '.id' post_output.json) ;;
-                "HASHNODE_SAVED_POST_SLUG") VALUE=$(jq -r '.slug' post_output.json) ;;
-                "HASHNODE_SAVED_POST_TITLE") VALUE=$(jq -r '.title' post_output.json) ;;
-                "HASHNODE_SAVED_POST_URL") VALUE=$(jq -r '.url' post_output.json) ;;
-                "HASHNODE_SAVED_POST_PUBLISHED_AT") VALUE=$(jq -r '.published_at' post_output.json) ;;
-                "HASHNODE_SAVED_POST_UPDATED_AT") VALUE=$(jq -r '.updated_at' post_output.json) ;;
-              esac
-              
-              # Update/create variable silently
-              gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
-                -f name="$var" -f value="$VALUE" >/dev/null 2>&1 || \
-              gh api --method POST /repos/${{ github.repository }}/actions/variables \
-                -f name="$var" -f value="$VALUE" >/dev/null 2>&1
-            done
-            
-            echo "✅ Repository variables updated successfully"
-          else
-            echo "⏭️ Skipping variable save due to processing errors"
-          fi
-        env:
           GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
-
-      # 7️⃣ Final output (clean and private)
-      - name: Show post status
-        run: |
-          echo "📢 Article processing completed on Hashnode"
-          echo "🔗 Check your Hashnode dashboard for the published/updated article"
