@@ -1,0 +1,111 @@
+name: 'Dev.to Auto Publisher'
+description: 'Automatically publish articles to Dev.to from your repository'
+author: 'Your Name'
+branding:
+  icon: 'edit'
+  color: 'black'
+
+inputs:
+  devto-api-key:
+    description: 'Dev.to API Key'
+    required: true
+  github-token:
+    description: 'GitHub Token with repository variables write permission'
+    required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '24'
+  script-path:
+    description: 'Path to the Dev.to script (relative to repo root)'
+    required: false
+    default: 'api/devto_post.js'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    
+    - name: Install dependencies
+      run: |
+        if [ -f package.json ]; then
+          npm install
+        else
+          echo "No package.json found, skipping npm install"
+        fi
+      shell: bash
+      
+    - name: Process Dev.to article
+      run: |
+        # Load saved variables silently
+        if [ -n "${{ vars.DEV_TO_SAVED_POST_ID }}" ]; then
+          export DEV_TO_SAVED_POST_ID="${{ vars.DEV_TO_SAVED_POST_ID }}"
+          export DEV_TO_SAVED_POST_TITLE="${{ vars.DEV_TO_SAVED_POST_TITLE }}"
+          export DEV_TO_SAVED_POST_URL="${{ vars.DEV_TO_SAVED_POST_URL }}"
+          export DEV_TO_SAVED_POST_PUBLISHED_AT="${{ vars.DEV_TO_SAVED_POST_PUBLISHED_AT }}"
+          export DEV_TO_SAVED_POST_UPDATED_AT="${{ vars.DEV_TO_SAVED_POST_UPDATED_AT }}"
+          echo "✅ Previous Dev.to post data loaded"
+        else
+          echo "ℹ️ No previous Dev.to post data found"
+        fi
+        
+        # Run script silently
+        echo "🔄 Processing Dev.to article..."
+        node ${{ inputs.script-path }} > devto_output.json 2>/dev/null
+        
+        # Validate and process JSON
+        if jq empty devto_output.json 2>/dev/null; then
+          echo "✅ Dev.to article processed successfully"
+          
+          # Extract data silently
+          POST_ID=$(jq -r '.id' devto_output.json)
+          POST_TITLE=$(jq -r '.title' devto_output.json)
+          POST_URL=$(jq -r '.url' devto_output.json)
+          POST_PUBLISHED_AT=$(jq -r '.published_at' devto_output.json)
+          POST_UPDATED_AT=$(jq -r '.updated_at' devto_output.json)
+          
+          # Save to repository variables silently
+          echo "💾 Updating Dev.to repository variables..."
+          
+          VARS=(
+            "DEV_TO_SAVED_POST_ID:$POST_ID"
+            "DEV_TO_SAVED_POST_TITLE:$POST_TITLE"
+            "DEV_TO_SAVED_POST_URL:$POST_URL"
+            "DEV_TO_SAVED_POST_PUBLISHED_AT:$POST_PUBLISHED_AT"
+            "DEV_TO_SAVED_POST_UPDATED_AT:$POST_UPDATED_AT"
+          )
+          
+          for var_pair in "${VARS[@]}"; do
+            VAR_NAME="${var_pair%%:*}"
+            VAR_VALUE="${var_pair#*:}"
+            
+            # Update or create variable silently
+            gh api --method PATCH "/repos/${{ github.repository }}/actions/variables/$VAR_NAME" \
+              -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1 || \
+            gh api --method POST "/repos/${{ github.repository }}/actions/variables" \
+              -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1
+          done
+          
+          echo "✅ Dev.to repository variables updated"
+          echo "📢 Article processing completed on Dev.to"
+          echo "🔗 Check your Dev.to dashboard for the published/updated article"
+          
+          # Clean up
+          rm -f devto_output.json
+          
+        else
+          echo "❌ Error: Invalid JSON output from Dev.to script"
+          echo "Script output (for debugging):"
+          cat devto_output.json
+          exit 1
+        fi
+      shell: bash
+      env:
+        DEV_TO_API_KEY: ${{ inputs.devto-api-key }}
+        GITHUB_USERNAME: ${{ github.repository_owner }}
+        GITHUB_REPO: ${{ github.event.repository.name }}
+        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}

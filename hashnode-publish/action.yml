@@ -1,0 +1,122 @@
+name: 'Hashnode Auto Publisher'
+description: 'Automatically publish articles to Hashnode from your repository'
+author: 'Your Name'
+branding:
+  icon: 'edit-3'
+  color: 'blue'
+
+inputs:
+  hashnode-pat:
+    description: 'Hashnode Personal Access Token'
+    required: true
+  hashnode-publication-id:
+    description: 'Hashnode Publication ID'
+    required: true
+  hashnode-publication-host:
+    description: 'Hashnode Publication Host'
+    required: true
+  github-token:
+    description: 'GitHub Token with repository variables write permission'
+    required: true
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+  script-path:
+    description: 'Path to the Hashnode script (relative to repo root)'
+    required: false
+    default: 'api/hashnode.js'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+    
+    - name: Install dependencies
+      run: |
+        if [ -f package.json ]; then
+          npm install
+        else
+          echo "No package.json found, skipping npm install"
+        fi
+      shell: bash
+      
+    - name: Process Hashnode article
+      run: |
+        # Load saved variables silently
+        if [ -n "${{ vars.HASHNODE_SAVED_POST_ID }}" ]; then
+          export HASHNODE_SAVED_POST_ID="${{ vars.HASHNODE_SAVED_POST_ID }}"
+          export HASHNODE_SAVED_POST_SLUG="${{ vars.HASHNODE_SAVED_POST_SLUG }}"
+          export HASHNODE_SAVED_POST_TITLE="${{ vars.HASHNODE_SAVED_POST_TITLE }}"
+          export HASHNODE_SAVED_POST_URL="${{ vars.HASHNODE_SAVED_POST_URL }}"
+          export HASHNODE_SAVED_POST_PUBLISHED_AT="${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}"
+          export HASHNODE_SAVED_POST_UPDATED_AT="${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}"
+          echo "✅ Previous Hashnode post data loaded"
+        else
+          echo "ℹ️ No previous Hashnode post data found"
+        fi
+        
+        # Run script silently
+        echo "🔄 Processing Hashnode article..."
+        node ${{ inputs.script-path }} > post_output.json 2>/dev/null
+        
+        # Validate and process JSON
+        if jq empty post_output.json 2>/dev/null; then
+          echo "✅ Hashnode article processed successfully"
+          
+          # Extract data silently
+          POST_ID=$(jq -r '.id' post_output.json)
+          POST_SLUG=$(jq -r '.slug' post_output.json)
+          POST_TITLE=$(jq -r '.title' post_output.json)
+          POST_URL=$(jq -r '.url' post_output.json)
+          POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)
+          POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)
+          
+          # Save to repository variables silently
+          echo "💾 Updating Hashnode repository variables..."
+          
+          VARS=(
+            "HASHNODE_SAVED_POST_ID:$POST_ID"
+            "HASHNODE_SAVED_POST_SLUG:$POST_SLUG"
+            "HASHNODE_SAVED_POST_TITLE:$POST_TITLE"
+            "HASHNODE_SAVED_POST_URL:$POST_URL"
+            "HASHNODE_SAVED_POST_PUBLISHED_AT:$POST_PUBLISHED_AT"
+            "HASHNODE_SAVED_POST_UPDATED_AT:$POST_UPDATED_AT"
+          )
+          
+          for var_pair in "${VARS[@]}"; do
+            VAR_NAME="${var_pair%%:*}"
+            VAR_VALUE="${var_pair#*:}"
+            
+            # Update or create variable silently
+            gh api --method PATCH "/repos/${{ github.repository }}/actions/variables/$VAR_NAME" \
+              -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1 || \
+            gh api --method POST "/repos/${{ github.repository }}/actions/variables" \
+              -f name="$VAR_NAME" -f value="$VAR_VALUE" >/dev/null 2>&1
+          done
+          
+          echo "✅ Hashnode repository variables updated"
+          echo "📢 Article processing completed on Hashnode"
+          echo "🔗 Check your Hashnode dashboard for the published/updated article"
+          
+          # Clean up
+          rm -f post_output.json
+          
+        else
+          echo "❌ Error: Invalid JSON output from Hashnode script"
+          echo "Script output (for debugging):"
+          cat post_output.json
+          exit 1
+        fi
+      shell: bash
+      env:
+        HASHNODE_PAT: ${{ inputs.hashnode-pat }}
+        HASHNODE_PUBLICATION_ID: ${{ inputs.hashnode-publication-id }}
+        HASHNODE_PUBLICATION_HOST: ${{ inputs.hashnode-publication-host }}
+        GITHUB_USERNAME: ${{ github.repository_owner }}
+        GITHUB_REPO: ${{ github.event.repository.name }}
+        GITHUB_BRANCH: ${{ github.ref_name }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
