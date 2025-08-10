@@ -1,4 +1,4 @@
-name: Post on Dev.to
+name: Auto publish on dev.to
 
 on:
   push:
@@ -33,11 +33,11 @@ jobs:
         run: npm install
 
       # 5️⃣ (Optional debug) List repo structure
-      - name: Debug repo files
-        run: |
-          pwd
-          ls -la
-          ls -la api/
+      # - name: Debug repo files
+      #   run: |
+      #     pwd
+      #     ls -la
+      #     ls -la api/
 
       # 6️⃣ Run your post/update script, output JSON
       - name: Run post script and capture output
@@ -97,8 +97,8 @@ jobs:
       - name: Show post info
         run: |
           echo "📢 Article posted/updated."
-          echo "ID: $DEV_TO_SAVED_POST_ID"
+          # echo "ID: $DEV_TO_SAVED_POST_ID"
           echo "Title: $DEV_TO_SAVED_POST_TITLE"
           echo "URL: $DEV_TO_SAVED_POST_URL"
-          echo "Published At: $DEV_TO_SAVED_POST_PUBLISHED_AT"
-          echo "Updated At: $DEV_TO_SAVED_POST_UPDATED_AT"
+          # echo "Published At: $DEV_TO_SAVED_POST_PUBLISHED_AT"
+          # echo "Updated At: $DEV_TO_SAVED_POST_UPDATED_AT"

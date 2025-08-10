@@ -46,7 +46,8 @@ Next platform to be integrated
 1. Generate a Personal Access Token (PAT) with the following scopes:
   - repo (for private repos)
   - workflow or actions:write (to update repo variables)
-2. Add the PAT as a secret named `VAR_EDIT_TOKEN_GIT` (or change the workflow accordingly).
+2. Add the PAT as a secret named `VAR_EDIT_TOKEN_GIT` (or change the workflow accordingly). (minimal permission to only edit this repo env vairalbe you can configure youself the low level permission to work with . set a expiration date, github will notify you when this token will expire you can renew that no need to set no expoeriation- not the best practice )
+
 3. Trigger the workflow on your repo.
 
 the tags need to be extracted from the readme with certain tags at the end of the read me if not found the age field should be ignored in the post or put command 
@@ -70,3 +71,8 @@ HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
 HASHNODE_PUBLICATION_HOST: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
 
 optionl : if you want to test locally make the variable in the .env to make works 
+- You can use this workflow in your github repo 
+
+# Be carefull 
+- as of now when you update someting in you blog it will be overwritten by this action (you have to update the readme and that will automatically updates the blog ) {future robust integration is need to do in this }
+

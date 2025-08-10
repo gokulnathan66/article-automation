@@ -1,4 +1,4 @@
-name: Post on Hashnode
+name: Auto publish on hashnode
 
 on:
   push:
@@ -35,11 +35,11 @@ jobs:
         run: npm install
 
       # 5️⃣ (Optional debug) List repo structure
-      - name: Debug repo files
-        run: |
-          pwd
-          ls -la
-          ls -la api/ || echo "api directory not found"
+      # - name: Debug repo files
+      #   run: |
+      #     pwd
+      #     ls -la
+      #     ls -la api/ || echo "api directory not found"
 
       # 6️⃣ Run your post/update script, output JSON
       - name: Run Hashnode post script and capture output
@@ -89,7 +89,7 @@ jobs:
 
             for var in "${!variables[@]}"; do
               VALUE="${variables[$var]}"
-              echo "Setting $var to: $VALUE"
+              # echo "Setting $var to: $VALUE"
               
               # Try to update existing variable, create if it doesn't exist
               gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
@@ -109,9 +109,9 @@ jobs:
       - name: Show post info
         run: |
           echo "📢 Article posted/updated on Hashnode."
-          echo "ID: $HASHNODE_SAVED_POST_ID"
+          # echo "ID: $HASHNODE_SAVED_POST_ID"
           echo "Slug: $HASHNODE_SAVED_POST_SLUG"  
           echo "Title: $HASHNODE_SAVED_POST_TITLE"
           echo "URL: $HASHNODE_SAVED_POST_URL"
-          echo "Published At: $HASHNODE_SAVED_POST_PUBLISHED_AT"
-          echo "Updated At: $HASHNODE_SAVED_POST_UPDATED_AT"
+          # echo "Published At: $HASHNODE_SAVED_POST_PUBLISHED_AT"
+          # echo "Updated At: $HASHNODE_SAVED_POST_UPDATED_AT"
