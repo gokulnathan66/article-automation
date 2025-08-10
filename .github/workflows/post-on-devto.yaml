@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Load any previously saved repo variables into environment
+      # 2️⃣ Load any previously saved repo variables into environment (silently)
       - name: Load saved post variables as env
         run: |
           echo "DEV_TO_SAVED_POST_ID=${{ vars.DEV_TO_SAVED_POST_ID }}" >> $GITHUB_ENV
@@ -21,6 +21,7 @@ jobs:
           echo "DEV_TO_SAVED_POST_URL=${{ vars.DEV_TO_SAVED_POST_URL }}" >> $GITHUB_ENV
           echo "DEV_TO_SAVED_POST_PUBLISHED_AT=${{ vars.DEV_TO_SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
           echo "DEV_TO_SAVED_POST_UPDATED_AT=${{ vars.DEV_TO_SAVED_POST_UPDATED_AT }}" >> $GITHUB_ENV
+          echo "✅ Post variables loaded from repository settings"
 
       # 3️⃣ Setup Node.js
       - name: Set up Node.js
@@ -32,32 +33,35 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 5️⃣ (Optional debug) List repo structure
-      # - name: Debug repo files
-      #   run: |
-      #     pwd
-      #     ls -la
-      #     ls -la api/
-
-      # 6️⃣ Run your post/update script, output JSON
+      # 5️⃣ Run your post/update script, output JSON (hidden from logs)
       - name: Run post script and capture output
         id: run_post
         run: |
-          node api/devto_post.js > post_output.json
-
-          # Uncomment for debugging:
-          # echo "Script output:"
-          # cat post_output.json
+          # Run script and capture output silently
+          node api/devto_post.js > post_output.json 2>/dev/null
 
           if jq empty post_output.json 2>/dev/null; then
-            echo "JSON is valid, extracting fields..."
-            echo "DEV_TO_SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
-            echo "DEV_TO_SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
-            echo "DEV_TO_SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
-            echo "DEV_TO_SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
-            echo "DEV_TO_SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
+            echo "✅ JSON output is valid, processing..."
+            # Extract fields silently (no echo to logs)
+            DEV_TO_SAVED_POST_ID=$(jq -r '.id' post_output.json)
+            DEV_TO_SAVED_POST_TITLE=$(jq -r '.title' post_output.json)
+            DEV_TO_SAVED_POST_URL=$(jq -r '.url' post_output.json)
+            DEV_TO_SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)
+            DEV_TO_SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)
+            
+            # Set environment variables silently
+            {
+              echo "DEV_TO_SAVED_POST_ID=$DEV_TO_SAVED_POST_ID"
+              echo "DEV_TO_SAVED_POST_TITLE=$DEV_TO_SAVED_POST_TITLE"
+              echo "DEV_TO_SAVED_POST_URL=$DEV_TO_SAVED_POST_URL"
+              echo "DEV_TO_SAVED_POST_PUBLISHED_AT=$DEV_TO_SAVED_POST_PUBLISHED_AT"
+              echo "DEV_TO_SAVED_POST_UPDATED_AT=$DEV_TO_SAVED_POST_UPDATED_AT"
+            } >> $GITHUB_ENV
+            
+            echo "✅ Post data processed successfully"
           else
-            echo "❌ Error: Output is not valid JSON" 
+            echo "❌ Error: Invalid JSON output from script"
+            echo "Script output (for debugging):"
             cat post_output.json
             exit 1
           fi
@@ -67,51 +71,40 @@ jobs:
           GITHUB_REPO: ${{ github.event.repository.name }}
           GITHUB_BRANCH: ${{ github.ref_name }}
 
-      # 7️⃣ Save details back into GitHub Repo Variables (Persistent between runs)
+      # 6️⃣ Save details back into GitHub Repo Variables (silently)
       - name: Save post details to repo variables
         run: |
-          if jq -e 'has("error") | not' post_output.json; then
-            echo "✅ Updating GitHub repository variables..."
-
-            # Save all variables with improved error handling
-            declare -A variables=(
-              ["DEV_TO_SAVED_POST_ID"]=$(jq -r '.id' post_output.json)
-              ["DEV_TO_SAVED_POST_TITLE"]=$(jq -r '.title' post_output.json)
-              ["DEV_TO_SAVED_POST_URL"]=$(jq -r '.url' post_output.json)
-              ["DEV_TO_SAVED_POST_PUBLISHED_AT"]=$(jq -r '.published_at' post_output.json)
-              ["DEV_TO_SAVED_POST_UPDATED_AT"]=$(jq -r '.updated_at' post_output.json)
-            )
-
-            for var in "${!variables[@]}"; do
-              VALUE="${variables[$var]}"
+          if jq -e 'has("error") | not' post_output.json >/dev/null 2>&1; then
+            echo "✅ Saving post details to repository variables..."
+            
+            # Variable names array
+            VARS=("DEV_TO_SAVED_POST_ID" "DEV_TO_SAVED_POST_TITLE" "DEV_TO_SAVED_POST_URL" "DEV_TO_SAVED_POST_PUBLISHED_AT" "DEV_TO_SAVED_POST_UPDATED_AT")
+            
+            for var in "${VARS[@]}"; do
+              case $var in
+                "DEV_TO_SAVED_POST_ID") VALUE=$(jq -r '.id' post_output.json) ;;
+                "DEV_TO_SAVED_POST_TITLE") VALUE=$(jq -r '.title' post_output.json) ;;
+                "DEV_TO_SAVED_POST_URL") VALUE=$(jq -r '.url' post_output.json) ;;
+                "DEV_TO_SAVED_POST_PUBLISHED_AT") VALUE=$(jq -r '.published_at' post_output.json) ;;
+                "DEV_TO_SAVED_POST_UPDATED_AT") VALUE=$(jq -r '.updated_at' post_output.json) ;;
+              esac
               
-              # Uncomment for debugging:
-              # echo "Setting $var to: $VALUE"
-              
-              # Try to update existing variable, create if it doesn't exist
+              # Update/create variable silently
               gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
-                -f name="$var" \
-                -f value="$VALUE" 2>/dev/null || \
+                -f name="$var" -f value="$VALUE" >/dev/null 2>&1 || \
               gh api --method POST /repos/${{ github.repository }}/actions/variables \
-                -f name="$var" \
-                -f value="$VALUE"
+                -f name="$var" -f value="$VALUE" >/dev/null 2>&1
             done
             
-            echo "✅ Repository variables updated successfully."
+            echo "✅ Repository variables updated successfully"
           else
-            echo "⏭ Skipped saving repo variables due to errors."
+            echo "⏭️ Skipping variable save due to processing errors"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # 🔑 User-provided PAT with repo + actions:write
+          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
 
-      # 8️⃣ Final output
+      # 7️⃣ Final output (clean and private)
       - name: Show post status
         run: |
-          echo "📢 Article processing completed on Dev.to."
-          
-          # Uncomment for debugging:
-          # echo "ID: $DEV_TO_SAVED_POST_ID"
-          # echo "Title: $DEV_TO_SAVED_POST_TITLE"
-          # echo "URL: $DEV_TO_SAVED_POST_URL"
-          # echo "Published At: $DEV_TO_SAVED_POST_PUBLISHED_AT"
-          # echo "Updated At: $DEV_TO_SAVED_POST_UPDATED_AT"
+          echo "📢 Article processing completed on Dev.to"
+          echo "🔗 Check your Dev.to dashboard for the published/updated article"

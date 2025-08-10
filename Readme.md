@@ -75,4 +75,5 @@ optionl : if you want to test locally make the variable in the .env to make work
 
 # Be carefull 
 - as of now when you update someting in you blog it will be overwritten by this action (you have to update the readme and that will automatically updates the blog ) {future robust integration is need to do in this }
+- some post id are still showing int he execution of my worklow 
 
