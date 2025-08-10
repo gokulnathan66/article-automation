@@ -1,11 +1,12 @@
-name: Post on Dev.to
+name: Post on Hashnode
 
-# on:
-#   push:
-#     branches: [main]  # Trigger on pushes to 'main' branch
+on:
+  push:
+    branches: [main]  # Trigger on pushes to 'main' branch
+  workflow_dispatch:    # Allow manual triggers
 
 jobs:
-  post-on-devto:
+  post-on-hashnode:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,6 +18,7 @@ jobs:
       - name: Load saved post variables as env
         run: |
           echo "SAVED_POST_ID=${{ vars.SAVED_POST_ID }}" >> $GITHUB_ENV
+          echo "SAVED_POST_SLUG=${{ vars.SAVED_POST_SLUG }}" >> $GITHUB_ENV
           echo "SAVED_POST_TITLE=${{ vars.SAVED_POST_TITLE }}" >> $GITHUB_ENV
           echo "SAVED_POST_URL=${{ vars.SAVED_POST_URL }}" >> $GITHUB_ENV
           echo "SAVED_POST_PUBLISHED_AT=${{ vars.SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
@@ -26,7 +28,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '24'
+          node-version: '20'
 
       # 4️⃣ Install dependencies
       - name: Install dependencies
@@ -37,13 +39,13 @@ jobs:
         run: |
           pwd
           ls -la
-          ls -la api/
+          ls -la api/ || echo "api directory not found"
 
       # 6️⃣ Run your post/update script, output JSON
-      - name: Run post script and capture output
+      - name: Run Hashnode post script and capture output
         id: run_post
         run: |
-          node api/devto_post.js > post_output.json
+          node api/hashnode.js > post_output.json
 
           echo "Script output:"
           cat post_output.json
@@ -51,6 +53,7 @@ jobs:
           if jq empty post_output.json 2>/dev/null; then
             echo "JSON is valid, extracting fields..."
             echo "SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
+            echo "SAVED_POST_SLUG=$(jq -r '.slug' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
             echo "SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
@@ -61,7 +64,9 @@ jobs:
             exit 1
           fi
         env:
-          DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
+          HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+          HASHNODE_PUBLICATION_HOST: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
           GITHUB_USERNAME: ${{ github.repository_owner }}
           GITHUB_REPO: ${{ github.event.repository.name }}
           GITHUB_BRANCH: ${{ github.ref_name }}
@@ -72,17 +77,24 @@ jobs:
           if jq -e 'has("error") | not' post_output.json; then
             echo "✅ Updating GitHub repository variables..."
 
-            for var in SAVED_POST_ID SAVED_POST_TITLE SAVED_POST_URL SAVED_POST_PUBLISHED_AT SAVED_POST_UPDATED_AT
-            do
-              VALUE=$(jq -r '.id' post_output.json)
-              if [ "$var" = "SAVED_POST_TITLE" ]; then VALUE=$(jq -r '.title' post_output.json); fi
-              if [ "$var" = "SAVED_POST_URL" ]; then VALUE=$(jq -r '.url' post_output.json); fi
-              if [ "$var" = "SAVED_POST_PUBLISHED_AT" ]; then VALUE=$(jq -r '.published_at' post_output.json); fi
-              if [ "$var" = "SAVED_POST_UPDATED_AT" ]; then VALUE=$(jq -r '.updated_at' post_output.json); fi
+            # Save all variables
+            declare -A variables=(
+              ["SAVED_POST_ID"]=$(jq -r '.id' post_output.json)
+              ["SAVED_POST_SLUG"]=$(jq -r '.slug' post_output.json)
+              ["SAVED_POST_TITLE"]=$(jq -r '.title' post_output.json)
+              ["SAVED_POST_URL"]=$(jq -r '.url' post_output.json)
+              ["SAVED_POST_PUBLISHED_AT"]=$(jq -r '.published_at' post_output.json)
+              ["SAVED_POST_UPDATED_AT"]=$(jq -r '.updated_at' post_output.json)
+            )
 
+            for var in "${!variables[@]}"; do
+              VALUE="${variables[$var]}"
+              echo "Setting $var to: $VALUE"
+              
+              # Try to update existing variable, create if it doesn't exist
               gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
                 -f name="$var" \
-                -f value="$VALUE" || \
+                -f value="$VALUE" 2>/dev/null || \
               gh api --method POST /repos/${{ github.repository }}/actions/variables \
                 -f name="$var" \
                 -f value="$VALUE"
@@ -91,13 +103,14 @@ jobs:
             echo "⏭ Skipped saving repo variables due to errors."
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}   # 🔑 User-provided PAT with repo + actions:write
+          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
 
       # 8️⃣ Final output
       - name: Show post info
         run: |
-          echo "📢 Article posted/updated."
+          echo "📢 Article posted/updated on Hashnode."
           echo "ID: $SAVED_POST_ID"
+          echo "Slug: $SAVED_POST_SLUG"  
           echo "Title: $SAVED_POST_TITLE"
           echo "URL: $SAVED_POST_URL"
           echo "Published At: $SAVED_POST_PUBLISHED_AT"

@@ -1,8 +1,8 @@
-# Article Automation for success test post 
+# Article Automation for success test post  Hashcode
 
 ![Article Automation](image.png)
 
-This project automates the process of synchronizing content between GitHub README files and various blogging platforms.
+This project automates the process of synchronizing content between GitHub README files and various blogging platforms. test hashcode 
 
 ## Overview
 
@@ -55,5 +55,16 @@ TAGS: javascript, automation, githubactions
     no non numerical vlaue no ` - in the tags `
 
 
-Next is linkedin article automation. 
+Next is linkedin article automation. linkedin outh is not supported for APIs
+Medium completely restrice the use of APIs and even when trying to post usuing the plawrigh automation it enable only the email login to completely cutoff the autoamtion so next implementaition is hashcode 
 
+
+# Hashcode automation 
+add the following in the gihtub secrets to make hashcode works 
+- hashcode publication id is present in your dashboard URL
+
+
+# Hashnode uses:
+HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}
+HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+HASHNODE_PUBLICATION_HOST: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
