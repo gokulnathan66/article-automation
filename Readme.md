@@ -1,11 +1,10 @@
 # Multi-Platform Blog Publisher
 
-![GitHub Actions](https://img.shields.io/static/v1?label=GitHub&message=Actions&color=2088FF&style=flat-square&logo=github-actions&logoColor=white)
-![Hashnode](https://img.shields.io/static/v1?label=Platform&message=Hashnode&color=2962FF&style=flat-square&logo=hashnode&logoColor=white)
-![Dev.to](https://img.shields.io/static/v1?label=Platform&message=Dev.to&color=0A0A0A&style=flat-square&logo=dev.to&logoColor=white)
-![MIT](https://img.shields.io/static/v1?label=License&message=MIT&color=green&style=flat-square)
-![Node.js](https://img.shields.io/static/v1?label=Node.js&message=20%2B&color=green&style=flat-square&logo=node.js&logoColor=white)
-![Status](https://img.shields.io/static/v1?label=Status&message=Production%20Ready&color=brightgreen&style=flat-square)
+[![GitHub Actions](https://img.shields.io/badge/GitHub-Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/features/actions)
+[![Hashnode](https://img.shields.io/badge/Platform-Hashnode-2962FF?style=for-the-badge&logo=hashnode&logoColor=white)](https://hashnode.com)
+[![Dev.to](https://img.shields.io/badge/Platform-Dev.to-0A0A0A?style=for-the-badge&logo=dev.to&logoColor=white)](https://dev.to)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://choosealicense.com/licenses/mit/)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-green?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 
 ---
 

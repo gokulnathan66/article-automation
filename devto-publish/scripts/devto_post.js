@@ -72,6 +72,20 @@ async function getReadmeData() {
       return newUrl;
     });
 
+  // Remove badges for Dev.to (they don't render well on Dev.to)
+  console.error('🧹 Removing badges for Dev.to compatibility...');
+  
+  // Remove shields.io badges (both linked and unlinked)
+  content = content.replace(/\[?\!\[[^\]]*\]\(https:\/\/img\.shields\.io\/[^)]+\)\]?(\([^)]+\))?/g, '');
+  
+  // Remove custom badge lines that might contain multiple badges
+  content = content.replace(/^.*img\.shields\.io.*$/gm, '');
+  
+  // Clean up empty lines left by badge removal
+  content = content.replace(/\n\s*\n\s*\n/g, '\n\n');
+  
+  console.error('✅ Badges removed for Dev.to');
+
   // Extract title from first # heading
   const titleLine = content.split('\n').find(line => line.startsWith('# '));
   const title = titleLine ? titleLine.replace(/^#\s+/, '').trim() : 'Untitled Post';
