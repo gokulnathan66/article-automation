@@ -63,7 +63,7 @@ Medium completely restrice the use of APIs and even when trying to post usuing t
 # Hashcode automation 
 add the following in the gihtub secrets to make hashcode works 
 - hashcode publication id is present in your dashboard URL
-
+# add the github url and the published article url manually in the repo readme for working reflecting in the blog. 
 
 # Hashnode uses:
 HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}

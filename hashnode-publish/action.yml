@@ -26,6 +26,31 @@ inputs:
     description: 'Path to the content/markdown files in user repo'
     required: false
     default: 'content'
+  # Add inputs for saved post data
+  saved-post-id:
+    description: 'Previously saved Hashnode post ID'
+    required: false
+    default: ''
+  saved-post-slug:
+    description: 'Previously saved Hashnode post slug'
+    required: false
+    default: ''
+  saved-post-title:
+    description: 'Previously saved Hashnode post title'
+    required: false
+    default: ''
+  saved-post-url:
+    description: 'Previously saved Hashnode post URL'
+    required: false
+    default: ''
+  saved-post-published-at:
+    description: 'Previously saved Hashnode post published date'
+    required: false
+    default: ''
+  saved-post-updated-at:
+    description: 'Previously saved Hashnode post updated date'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -54,15 +79,15 @@ runs:
       
     - name: Process Hashnode article
       run: |
-        # Load saved variables silently
-        if [ -n "${{ vars.HASHNODE_SAVED_POST_ID }}" ]; then
-          export HASHNODE_SAVED_POST_ID="${{ vars.HASHNODE_SAVED_POST_ID }}"
-          export HASHNODE_SAVED_POST_SLUG="${{ vars.HASHNODE_SAVED_POST_SLUG }}"
-          export HASHNODE_SAVED_POST_TITLE="${{ vars.HASHNODE_SAVED_POST_TITLE }}"
-          export HASHNODE_SAVED_POST_URL="${{ vars.HASHNODE_SAVED_POST_URL }}"
-          export HASHNODE_SAVED_POST_PUBLISHED_AT="${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}"
-          export HASHNODE_SAVED_POST_UPDATED_AT="${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}"
-          echo "✅ Previous Hashnode post data loaded"
+        # Load saved variables from inputs
+        if [ -n "${{ inputs.saved-post-id }}" ]; then
+          export HASHNODE_SAVED_POST_ID="${{ inputs.saved-post-id }}"
+          export HASHNODE_SAVED_POST_SLUG="${{ inputs.saved-post-slug }}"
+          export HASHNODE_SAVED_POST_TITLE="${{ inputs.saved-post-title }}"
+          export HASHNODE_SAVED_POST_URL="${{ inputs.saved-post-url }}"
+          export HASHNODE_SAVED_POST_PUBLISHED_AT="${{ inputs.saved-post-published-at }}"
+          export HASHNODE_SAVED_POST_UPDATED_AT="${{ inputs.saved-post-updated-at }}"
+          echo "✅ Previous Hashnode post data loaded from inputs"
         else
           echo "ℹ️ No previous Hashnode post data found"
         fi
