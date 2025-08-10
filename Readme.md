@@ -203,3 +203,244 @@ Feel free to submit issues and enhancement requests!
 ## 📄 License
 
 MIT License
+
+
+# Multi-Platform Blog Publisher
+
+🚀 **Automatically publish your articles to multiple blogging platforms using GitHub Actions**
+
+[![GitHub](https://img.shields.io/badge/GitHub-Actions-blue)](https://github.com/features/actions)
+[![Hashnode](https://img.shields.io/badge/Platform-Hashnode-2962ff)](https://hashnode.com)
+[![Dev.to](https://img.shields.io/badge/Platform-Dev.to-0a0a0a)](https://dev.to)
+
+## ✨ Features
+
+- **🔄 Zero Setup**: No need to create API scripts - everything is included
+- **🌐 Multi-Platform**: Supports Hashnode and Dev.to
+- **🧠 Smart Updates**: Automatically tracks and updates existing posts
+- **🖼️ Image Processing**: Converts relative image paths to GitHub raw URLs
+- **📝 Flexible Content**: Works with any markdown content structure
+- **🔒 Secure**: All credentials stay in your repository secrets
+
+## 🏗️ Repository Structure
+
+article-automation/
+├── hashnode-publish/
+│ ├── action.yml # Hashnode action definition
+│ └── scripts/
+│ └── hashnode.js # Hashnode publishing script
+├── devto-publish/
+│ ├── action.yml # Dev.to action definition
+│ └── scripts/
+│ └── devto_post.js # Dev.to publishing script
+├── package.json # Dependencies for scripts
+└── README.md # This file
+text
+
+## 🚀 Quick Start for Users
+
+### Step 1: Set up your content repository
+
+Create a repository with your markdown content:
+
+your-blog-repo/
+├── content/ # Your articles directory
+│ └── README.md # Your article content
+├── .github/workflows/
+│ └── publish.yml # Workflow using these actions
+└── images/ # Optional: images referenced in articles
+└── screenshot.png
+text
+
+### Step 2: Configure GitHub Secrets
+
+Go to **Settings → Secrets and variables → Actions** and add:
+
+#### For Hashnode:
+- `HASHNODE_PAT` - Your Hashnode Personal Access Token
+- `HASHNODE_PUBLICATION_ID` - Your publication ID
+- `HASHNODE_PUBLICATION_HOST` - Your publication domain (e.g., `yourblog.hashnode.dev`)
+- `VAR_EDIT_TOKEN_GIT` - GitHub token with `repo` and `actions:write` permissions
+
+#### For Dev.to:
+- `DEV_TO_API_KEY` - Your Dev.to API Key
+- `VAR_EDIT_TOKEN_GIT` - GitHub token with `repo` and `actions:write` permissions
+
+### Step 3: Create workflow
+
+Create `.github/workflows/publish.yml`:
+
+name: Multi-Platform Publishing
+on:
+push:
+branches: [main]
+workflow_dispatch:
+jobs:
+publish-hashnode:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout content
+uses: actions/checkout@v4
+text
+  - name: Publish to Hashnode
+    uses: gokulnathan66/article-automation/hashnode-publish@main
+    with:
+      hashnode-pat: ${{ secrets.HASHNODE_PAT }}
+      hashnode-publication-id: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+      hashnode-publication-host: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
+      github-token: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+      saved-post-id: ${{ vars.HASHNODE_SAVED_POST_ID }}
+      saved-post-slug: ${{ vars.HASHNODE_SAVED_POST_SLUG }}
+      saved-post-title: ${{ vars.HASHNODE_SAVED_POST_TITLE }}
+      saved-post-url: ${{ vars.HASHNODE_SAVED_POST_URL }}
+      saved-post-published-at: ${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}
+      saved-post-updated-at: ${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}
+publish-devto:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout content
+uses: actions/checkout@v4
+text
+  - name: Publish to Dev.to
+    uses: gokulnathan66/article-automation/devto-publish@main
+    with:
+      devto-api-key: ${{ secrets.DEV_TO_API_KEY }}
+      github-token: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+      saved-post-id: ${{ vars.DEV_TO_SAVED_POST_ID }}
+      saved-post-title: ${{ vars.DEV_TO_SAVED_POST_TITLE }}
+      saved-post-url: ${{ vars.DEV_TO_SAVED_POST_URL }}
+      saved-post-published-at: ${{ vars.DEV_TO_SAVED_POST_PUBLISHED_AT }}
+      saved-post-updated-at: ${{ vars.DEV_TO_SAVED_POST_UPDATED_AT }}
+text
+
+## 📝 Content Format
+
+Your markdown files should follow this format:
+
+Your Article Title
+Your content here with markdown formatting.
+Sections
+You can include images, code blocks, and other markdown elements.
+![Screenshot](images/screenshot. at the end (optional) -->
+Tags: javascript, tutorial, webdev, github-actions
+text
+
+## ⚙️ Configuration Options
+
+### Hashnode Action Inputs:
+- `hashnode-pat` (required): Hashnode Personal Access Token
+- `hashnode-publication-id` (required): Publication ID
+- `hashnode-publication-host` (required): Publication host
+- `github-token` (required): GitHub token
+- `content-path` (optional): Path to content files (default: 'content')
+- `node-version` (optional): Node.js version (default: '20')
+- `saved-post-*` (optional): Previously saved post data for updates
+
+### Dev.to Action Inputs:
+- `devto-api-key` (required): Dev.to API Key
+- `github-token` (required): GitHub token
+- `content-path` (optional): Path to content files (default: 'content')
+- `node-version` (optional): Node.js version (default: '24')
+- `saved-post-*` (optional): Previously saved post data for updates
+
+## 🔧 How It Works
+
+1. **Content Detection**: Finds README.md in your content directory or repository root
+2. **Title Extraction**: Uses the first `# heading` as the article title
+3. **Image Processing**: Converts relative image paths to GitHub raw URLs
+4. **Tag Processing**: Extracts tags from `Tags:` line at the end of content
+5. **Smart Publishing**: 
+   - Checks for existing posts with the same title
+   - Creates new post if none exists
+   - Updates existing post if found
+6. **State Management**: Saves post IDs and metadata to repository variables for future updates
+
+## 📖 Setup Instructions
+
+### Getting Hashnode Credentials:
+
+1. **Personal Access Token**:
+   - Go to [Hashnode](https://hashnode.com) → Settings → Developer
+   - Generate Personal Access Token
+   - Add as `HASHNODE_PAT` secret
+
+2. **Publication Details**:
+   - Go to your publication dashboard
+   - Copy Publication ID from the URL or settings
+   - Use your publication domain (e.g., `yourblog.hashnode.dev`)
+
+### Getting Dev.to API Key:
+
+1. Go to [Dev.to](https://dev.to) → Settings → Extensions
+2. Scroll to "DEV Community API Keys"
+3. Generate a new API key
+4. Add as `DEV_TO_API_KEY` secret
+
+### Setting up GitHub Token:
+
+1. Go to GitHub → Settings → Developer settings → Personal access tokens
+2. Generate token with these scopes:
+   - `repo` (full repository access)
+   - `actions:write` (to update repository variables)
+3. Add as `VAR_EDIT_TOKEN_GIT` secret
+
+## 🎯 Usage Examples
+
+### Single Platform:
+
+Hashnode only
+uses: gokulnathan66/article-automation/hashnode-publish@main
+Dev.to only
+uses: gokulnathan66/article-automation/devto-publish@main
+text
+
+### Custom Content Path:
+
+uses: gokulnathan66/article-automation/hashnode-publish@main
+with:
+... other inputs
+content-path: 'articles' # Look in 'articles' directory instead
+text
+
+### Different Node.js Version:
+
+uses: gokulnathan66/article-automation/devto-publish@main
+with:
+... other inputs
+node-version: '18' # Use Node.js 18 instead of default 24
+text
+
+## 🔍 Troubleshooting
+
+### Common Issues:
+
+1. **Action not found**: Ensure repository is public
+2. **README not found**: Check content directory path and file exists
+3. **API errors**: Verify all secrets are correctly configured
+4. **Permission errors**: Ensure GitHub token has required scopes
+
+### Debug Information:
+
+The actions provide comprehensive logging. Check the Actions tab in your repository for detailed execution logs.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- Built with [GitHub Actions](https://github.com/features/actions)
+- Integrates with [Hashnode](https://hashnode.com) and [Dev.to](https://dev.to)
+- Inspired by the need for automated content distribution
+
+---
+
+**Made with ❤️ by [Gokul Nathan B](https://github.com/gokulnathan66)**
