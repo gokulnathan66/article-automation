@@ -1,13 +1,13 @@
 # Multi-Platform Blog Publisher
 
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat&logo=github-actions&logoColor=white)
-![Hashnode](https://img.shields.io/badge/Hashnode-2962FF?style=flat&logo=hashnode&logoColor=white)
-![Dev.to](https://img.shields.io/badge/Dev.to-0A0A0A?style=flat&logo=dev.to&logoColor=white)
-![MIT License](https://img.shields.io/badge/License-MIT-green?style=flat)
-![Node.js](https://img.shields.io/badge/Node.js-v20+-green?style=flat&logo=node.js&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Production_Ready-brightgreen?style=flat)
+![GitHub Actions](https://img.shields.io/static/v1?label=GitHub&message=Actions&color=2088FF&style=flat-square&logo=github-actions&logoColor=white)
+![Hashnode](https://img.shields.io/static/v1?label=Platform&message=Hashnode&color=2962FF&style=flat-square&logo=hashnode&logoColor=white)
+![Dev.to](https://img.shields.io/static/v1?label=Platform&message=Dev.to&color=0A0A0A&style=flat-square&logo=dev.to&logoColor=white)
+![MIT](https://img.shields.io/static/v1?label=License&message=MIT&color=green&style=flat-square)
+![Node.js](https://img.shields.io/static/v1?label=Node.js&message=20%2B&color=green&style=flat-square&logo=node.js&logoColor=white)
+![Status](https://img.shields.io/static/v1?label=Status&message=Production%20Ready&color=brightgreen&style=flat-square)
 
-**Platforms**: GitHub Actions • Hashnode • Dev.to | **License**: MIT | **Node.js**: 20+
+---
 
 > 🚀 **Automatically publish your articles to multiple blogging platforms using GitHub Actions**
 
