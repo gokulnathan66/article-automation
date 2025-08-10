@@ -1,68 +1,185 @@
-name: Post on Hashnode
+name: Auto-publish to Hashnode
 
 on:
   push:
-    branches: [main]  # Trigger on pushes to 'main' branch
+    branches: [main, master]  # Support both common default branches
   workflow_dispatch:    # Allow manual triggers
 
 jobs:
-  post-on-hashnode:
+  publish-to-hashnode:
     runs-on: ubuntu-latest
+    
+    # Add permissions for the workflow
+    permissions:
+      contents: read
+      actions: write
 
     steps:
       # 1️⃣ Checkout code for access to README.md and script
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # Use latest version
 
       # 2️⃣ Load any previously saved repo variables into environment
       - name: Load saved post variables as env
         run: |
-          echo "HASHNODE_SAVED_POST_ID=${{ vars.HASHNODE_SAVED_POST_ID }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_SLUG=${{ vars.HASHNODE_SAVED_POST_SLUG }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_TITLE=${{ vars.HASHNODE_SAVED_POST_TITLE }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_URL=${{ vars.HASHNODE_SAVED_POST_URL }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_PUBLISHED_AT=${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT }}" >> $GITHUB_ENV
-          echo "HASHNODE_SAVED_POST_UPDATED_AT=${{ vars.HASHNODE_SAVED_POST_UPDATED_AT }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_ID=${{ vars.HASHNODE_SAVED_POST_ID || '' }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_SLUG=${{ vars.HASHNODE_SAVED_POST_SLUG || '' }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_TITLE=${{ vars.HASHNODE_SAVED_POST_TITLE || '' }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_URL=${{ vars.HASHNODE_SAVED_POST_URL || '' }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_PUBLISHED_AT=${{ vars.HASHNODE_SAVED_POST_PUBLISHED_AT || '' }}" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_UPDATED_AT=${{ vars.HASHNODE_SAVED_POST_UPDATED_AT || '' }}" >> $GITHUB_ENV
 
       # 3️⃣ Setup Node.js
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 'lts/*'  # Use latest LTS version
+          cache: 'npm'  # Cache npm dependencies
 
-      # 4️⃣ Install dependencies
-      - name: Install dependencies
-        run: npm install
-
-      # 5️⃣ (Optional debug) List repo structure
-      - name: Debug repo files
+      # 4️⃣ Validate required environment variables
+      - name: Validate configuration
         run: |
-          pwd
-          ls -la
-          ls -la api/ || echo "api directory not found"
-
-      # 6️⃣ Run your post/update script, output JSON
-      - name: Run Hashnode post script and capture output
-        id: run_post
-        run: |
-          node api/hashnode.js > post_output.json
-
-          echo "Script output:"
-          cat post_output.json
-
-          if jq empty post_output.json 2>/dev/null; then
-            echo "JSON is valid, extracting fields..."
-            echo "HASHNODE_SAVED_POST_ID=$(jq -r '.id' post_output.json)" >> $GITHUB_ENV
-            echo "HASHNODE_SAVED_POST_SLUG=$(jq -r '.slug' post_output.json)" >> $GITHUB_ENV
-            echo "HASHNODE_SAVED_POST_TITLE=$(jq -r '.title' post_output.json)" >> $GITHUB_ENV
-            echo "HASHNODE_SAVED_POST_URL=$(jq -r '.url' post_output.json)" >> $GITHUB_ENV
-            echo "HASHNODE_SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at' post_output.json)" >> $GITHUB_ENV
-            echo "HASHNODE_SAVED_POST_UPDATED_AT=$(jq -r '.updated_at' post_output.json)" >> $GITHUB_ENV
-          else
-            echo "❌ Error: Output is not valid JSON"
-            cat post_output.json
+          echo "🔍 Validating Hashnode configuration..."
+          
+          # Check for required secrets
+          if [ -z "${{ secrets.HASHNODE_PAT }}" ]; then
+            echo "❌ ERROR: HASHNODE_PAT secret is not set"
+            echo "Please add your Hashnode Personal Access Token as a repository secret"
             exit 1
           fi
+          
+          if [ -z "${{ secrets.HASHNODE_PUBLICATION_ID }}" ]; then
+            echo "❌ ERROR: HASHNODE_PUBLICATION_ID secret is not set"
+            echo "Please add your Hashnode Publication ID as a repository secret"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.HASHNODE_PUBLICATION_HOST }}" ]; then
+            echo "❌ ERROR: HASHNODE_PUBLICATION_HOST secret is not set"
+            echo "Please add your Hashnode blog host (e.g., 'yourblog.hashnode.dev') as a repository secret"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are configured"
+
+      # 5️⃣ Check for required files and directories
+      - name: Validate repository structure
+        run: |
+          echo "📁 Checking repository structure..."
+          
+          # Check if README exists
+          README_FILE=""
+          for file in README.md Readme.md readme.md; do
+            if [ -f "$file" ]; then
+              README_FILE="$file"
+              echo "✅ Found README file: $file"
+              break
+            fi
+          done
+          
+          if [ -z "$README_FILE" ]; then
+            echo "❌ ERROR: No README.md file found in repository root"
+            echo "Please create a README.md file with your article content"
+            exit 1
+          fi
+          
+          # Check if package.json exists, if not create a basic one
+          if [ ! -f "package.json" ]; then
+            echo "📦 Creating basic package.json..."
+            cat > package.json << 'EOF'
+          {
+            "name": "hashnode-auto-publisher",
+            "version": "1.0.0",
+            "type": "module",
+            "description": "Auto-publish articles to Hashnode",
+            "scripts": {
+              "publish": "node api/hashnode.js"
+            },
+            "dependencies": {
+              "dotenv": "^16.0.0"
+            }
+          }
+          EOF
+          fi
+          
+          # Check if api directory exists
+          if [ ! -d "api" ]; then
+            echo "📁 Creating api directory..."
+            mkdir -p api
+          fi
+          
+          # Check if hashnode.js exists, if not provide instructions
+          if [ ! -f "api/hashnode.js" ]; then
+            echo "❌ ERROR: api/hashnode.js script not found"
+            echo "Please create the api/hashnode.js script file"
+            echo "You can get the template from: https://gist.github.com/your-gist-link"
+            exit 1
+          fi
+
+      # 6️⃣ Install dependencies
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies..."
+          npm install
+          
+          # Install additional dependencies if needed
+          npm list dotenv || npm install dotenv
+
+      # 7️⃣ Run validation checks on the script
+      - name: Validate Hashnode script
+        run: |
+          echo "🔍 Validating Hashnode script..."
+          
+          # Check if the script is syntactically correct
+          node -c api/hashnode.js || {
+            echo "❌ ERROR: Syntax error in api/hashnode.js"
+            exit 1
+          }
+          
+          echo "✅ Script syntax is valid"
+
+      # 8️⃣ Run the post/update script with enhanced error handling
+      - name: Run Hashnode publisher
+        id: run_post
+        run: |
+          echo "🚀 Publishing/updating article on Hashnode..."
+          
+          # Run the script and capture output
+          if ! node api/hashnode.js > post_output.json 2> error_log.txt; then
+            echo "❌ Script execution failed"
+            echo "Error log:"
+            cat error_log.txt
+            exit 1
+          fi
+          
+          echo "📄 Script output:"
+          cat post_output.json
+          
+          # Validate JSON output
+          if ! jq empty post_output.json 2>/dev/null; then
+            echo "❌ Error: Output is not valid JSON"
+            echo "Raw output:"
+            cat post_output.json
+            echo "Error log:"
+            cat error_log.txt
+            exit 1
+          fi
+          
+          # Check if it's an error response
+          if jq -e 'has("error") and .error == true' post_output.json > /dev/null; then
+            echo "❌ Script reported an error:"
+            jq -r '.message // "Unknown error"' post_output.json
+            exit 1
+          fi
+          
+          echo "✅ JSON output is valid, extracting fields..."
+          echo "HASHNODE_SAVED_POST_ID=$(jq -r '.id // ""' post_output.json)" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_SLUG=$(jq -r '.slug // ""' post_output.json)" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_TITLE=$(jq -r '.title // ""' post_output.json)" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_URL=$(jq -r '.url // ""' post_output.json)" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_PUBLISHED_AT=$(jq -r '.published_at // ""' post_output.json)" >> $GITHUB_ENV
+          echo "HASHNODE_SAVED_POST_UPDATED_AT=$(jq -r '.updated_at // ""' post_output.json)" >> $GITHUB_ENV
+          
         env:
           HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}
           HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
@@ -71,47 +188,73 @@ jobs:
           GITHUB_REPO: ${{ github.event.repository.name }}
           GITHUB_BRANCH: ${{ github.ref_name }}
 
-      # 7️⃣ Save details back into GitHub Repo Variables (Persistent between runs)
+      # 9️⃣ Save post details to repository variables
       - name: Save post details to repo variables
         run: |
-          if jq -e 'has("error") | not' post_output.json; then
-            echo "✅ Updating GitHub repository variables..."
-
-            # Save all variables
-            declare -A variables=(
-              ["HASHNODE_SAVED_POST_ID"]=$(jq -r '.id' post_output.json)
-              ["HASHNODE_SAVED_POST_SLUG"]=$(jq -r '.slug' post_output.json)
-              ["HASHNODE_SAVED_POST_TITLE"]=$(jq -r '.title' post_output.json)
-              ["HASHNODE_SAVED_POST_URL"]=$(jq -r '.url' post_output.json)
-              ["HASHNODE_SAVED_POST_PUBLISHED_AT"]=$(jq -r '.published_at' post_output.json)
-              ["HASHNODE_SAVED_POST_UPDATED_AT"]=$(jq -r '.updated_at' post_output.json)
-            )
-
-            for var in "${!variables[@]}"; do
-              VALUE="${variables[$var]}"
-              echo "Setting $var to: $VALUE"
+          echo "💾 Saving post details to repository variables..."
+          
+          # Check if we have valid data to save
+          if [ -z "$HASHNODE_SAVED_POST_ID" ]; then
+            echo "⚠️ No post ID found, skipping variable save"
+            exit 0
+          fi
+          
+          # Define variables to save
+          declare -A variables=(
+            ["HASHNODE_SAVED_POST_ID"]="$HASHNODE_SAVED_POST_ID"
+            ["HASHNODE_SAVED_POST_SLUG"]="$HASHNODE_SAVED_POST_SLUG"
+            ["HASHNODE_SAVED_POST_TITLE"]="$HASHNODE_SAVED_POST_TITLE"
+            ["HASHNODE_SAVED_POST_URL"]="$HASHNODE_SAVED_POST_URL"
+            ["HASHNODE_SAVED_POST_PUBLISHED_AT"]="$HASHNODE_SAVED_POST_PUBLISHED_AT"
+            ["HASHNODE_SAVED_POST_UPDATED_AT"]="$HASHNODE_SAVED_POST_UPDATED_AT"
+          )
+          
+          echo "✅ Updating GitHub repository variables..."
+          
+          for var_name in "${!variables[@]}"; do
+            var_value="${variables[$var_name]}"
+            
+            if [ -n "$var_value" ] && [ "$var_value" != "null" ]; then
+              echo "Setting $var_name to: $var_value"
               
               # Try to update existing variable, create if it doesn't exist
-              gh api --method PATCH /repos/${{ github.repository }}/actions/variables/$var \
-                -f name="$var" \
-                -f value="$VALUE" 2>/dev/null || \
-              gh api --method POST /repos/${{ github.repository }}/actions/variables \
-                -f name="$var" \
-                -f value="$VALUE"
-            done
-          else
-            echo "⏭ Skipped saving repo variables due to errors."
-          fi
+              if ! gh api --method PATCH "/repos/${{ github.repository }}/actions/variables/$var_name" \
+                -f name="$var_name" \
+                -f value="$var_value" 2>/dev/null; then
+                
+                echo "Creating new variable: $var_name"
+                gh api --method POST "/repos/${{ github.repository }}/actions/variables" \
+                  -f name="$var_name" \
+                  -f value="$var_value"
+              fi
+            else
+              echo "Skipping empty value for: $var_name"
+            fi
+          done
+          
         env:
-          GITHUB_TOKEN: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+          GITHUB_TOKEN: ${{ github.token }}  # Use built-in token instead of custom secret
 
-      # 8️⃣ Final output
-      - name: Show post info
+      # 🔟 Display final results
+      - name: Display results
         run: |
-          echo "📢 Article posted/updated on Hashnode."
-          echo "ID: $HASHNODE_SAVED_POST_ID"
-          echo "Slug: $HASHNODE_SAVED_POST_SLUG"  
-          echo "Title: $HASHNODE_SAVED_POST_TITLE"
-          echo "URL: $HASHNODE_SAVED_POST_URL"
-          echo "Published At: $HASHNODE_SAVED_POST_PUBLISHED_AT"
-          echo "Updated At: $HASHNODE_SAVED_POST_UPDATED_AT"
+          echo "🎉 Hashnode publication completed!"
+          echo ""
+          echo "📊 Post Details:"
+          echo "├─ ID: ${HASHNODE_SAVED_POST_ID:-'N/A'}"
+          echo "├─ Slug: ${HASHNODE_SAVED_POST_SLUG:-'N/A'}"
+          echo "├─ Title: ${HASHNODE_SAVED_POST_TITLE:-'N/A'}"
+          echo "├─ URL: ${HASHNODE_SAVED_POST_URL:-'N/A'}"
+          echo "├─ Published: ${HASHNODE_SAVED_POST_PUBLISHED_AT:-'N/A'}"
+          echo "└─ Updated: ${HASHNODE_SAVED_POST_UPDATED_AT:-'N/A'}"
+          
+          if [ -n "$HASHNODE_SAVED_POST_URL" ] && [ "$HASHNODE_SAVED_POST_URL" != "null" ]; then
+            echo ""
+            echo "🔗 View your article: $HASHNODE_SAVED_POST_URL"
+          fi
+
+      # 1️⃣1️⃣ Cleanup temporary files
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f post_output.json error_log.txt

@@ -68,3 +68,5 @@ add the following in the gihtub secrets to make hashcode works
 HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}
 HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
 HASHNODE_PUBLICATION_HOST: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
+
+optionl : if you want to test locally make the variable in the .env to make works 
