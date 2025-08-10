@@ -1,6 +1,6 @@
 name: 'Dev.to Auto Publisher'
 description: 'Automatically publish articles to Dev.to from your repository'
-author: 'Your Name'
+author: 'Gokul Nathan B'
 branding:
   icon: 'edit'
   color: 'black'
@@ -16,25 +16,33 @@ inputs:
     description: 'Node.js version to use'
     required: false
     default: '24'
-  script-path:
-    description: 'Path to the Dev.to script (relative to repo root)'
+  content-path:
+    description: 'Path to the content/markdown files in user repo'
     required: false
-    default: 'api/devto_post.js'
+    default: 'content'
 
 runs:
   using: 'composite'
   steps:
+    - name: Checkout action repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.action_repository }}
+        path: action-repo
+        
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ inputs.node-version }}
     
-    - name: Install dependencies
+    - name: Install action dependencies
       run: |
+        cd action-repo
         if [ -f package.json ]; then
           npm install
+          echo "✅ Installed action dependencies"
         else
-          echo "No package.json found, skipping npm install"
+          echo "No package.json found in action repo"
         fi
       shell: bash
       
@@ -52,9 +60,15 @@ runs:
           echo "ℹ️ No previous Dev.to post data found"
         fi
         
-        # Run script silently
+        # Set content path for the script
+        export USER_CONTENT_PATH="${{ inputs.content-path }}"
+        export USER_REPO_PATH="$GITHUB_WORKSPACE"
+        
+        # Run script from action repository
         echo "🔄 Processing Dev.to article..."
-        node ${{ inputs.script-path }} > devto_output.json 2>/dev/null
+        cd action-repo
+        node devto-publish/scripts/devto_post.js > ../devto_output.json 2>/dev/null
+        cd ..
         
         # Validate and process JSON
         if jq empty devto_output.json 2>/dev/null; then

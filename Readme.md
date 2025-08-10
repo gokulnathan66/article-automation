@@ -78,60 +78,128 @@ optionl : if you want to test locally make the variable in the .env to make work
 - some post id are still showing int he execution of my worklow 
 
 
-# calling the publicshed workflow
-name: Auto publish on hashnode
+# Multi-Platform Blog Publisher
 
+🚀 Automatically publish your articles to multiple blogging platforms using GitHub Actions.
+
+## ✨ Features
+
+- **Zero Setup**: No need to create API scripts - everything is included
+- **Multi-Platform**: Supports Hashnode and Dev.to
+- **Smart Updates**: Tracks and updates existing posts automatically
+- **Flexible Content**: Works with any markdown content structure
+- **Image Processing**: Automatically converts relative image paths to GitHub raw URLs
+
+## 🏗️ Repository Structure
+
+article-automation/
+├── hashnode-publish/
+│ ├── action.yml # Hashnode action definition
+│ └── scripts/
+│ └── hashnode.js # Hashnode publishing script
+├── devto-publish/
+│ ├── action.yml # Dev.to action definition
+│ └── scripts/
+│ └── devto_post.js # Dev.to publishing script
+├── package.json # Dependencies
+└── README.md # This file
+text
+
+## 🚀 Quick Start for Users
+
+### Step 1: Set up your content repository
+
+your-blog-repo/
+├── content/ # Your articles (customizable path)
+│ ├── article1.md
+│ └── article2.md
+├── .github/workflows/
+│ └── publish.yml
+└── README.md
+text
+
+### Step 2: Add GitHub Secrets
+
+**For Hashnode:**
+- `HASHNODE_PAT`
+- `HASHNODE_PUBLICATION_ID` 
+- `HASHNODE_PUBLICATION_HOST`
+- `VAR_EDIT_TOKEN_GIT`
+
+**For Dev.to:**
+- `DEV_TO_API_KEY`
+- `VAR_EDIT_TOKEN_GIT`
+
+### Step 3: Create workflow
+
+name: Publish Articles
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
+push:
+branches: [main]
+workflow_dispatch:
 jobs:
-  publish:
-    uses: YOUR_USERNAME/YOUR_REPO/.github/workflows/hashnode-publish-reusable.yml@main
-    secrets:
-      HASHNODE_PAT: ${{ secrets.HASHNODE_PAT }}
-      HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
-      HASHNODE_PUBLICATION_HOST: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
-      VAR_EDIT_TOKEN_GIT: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+publish-hashnode:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout content
+uses: actions/checkout@v4
+text
+  - name: Publish to Hashnode
+    uses: gokulnathb/article-automation/hashnode-publish@main
+    with:
+      hashnode-pat: ${{ secrets.HASHNODE_PAT }}
+      hashnode-publication-id: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+      hashnode-publication-host: ${{ secrets.HASHNODE_PUBLICATION_HOST }}
+      github-token: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+publish-devto:
+runs-on: ubuntu-latest
+steps:
+- name: Checkout content
+uses: actions/checkout@v4
+text
+  - name: Publish to Dev.to
+    uses: gokulnathb/article-automation/devto-publish@main
+    with:
+      devto-api-key: ${{ secrets.DEV_TO_API_KEY }}
+      github-token: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+text
 
-# Dev.to Auto Publisher
+## 📝 Content Format
 
-## Setup Instructions
+Your markdown files should include:
 
-1. **Get your Dev.to API Key:**
-   - Go to Dev.to Settings → Extensions → DEV Community API Keys
-   - Generate a new API key
+Your Article Title
+Your content here...
+<!-- Optional: Add tags at the end -->
+Tags: javascript, tutorial, webdev
+text
 
-2. **Set up GitHub Secrets:**
-   - Go to Settings → Secrets and variables → Actions
-   - Add the following secrets:
-     - `DEV_TO_API_KEY`: Your Dev.to API Key
-     - `VAR_EDIT_TOKEN_GIT`: GitHub token with repository access
+## 🔧 Customization Options
 
-3. **Create your content structure** (document your expected file structure)
+Both actions accept these inputs:
+- `content-path`: Path to your markdown files (default: 'content')
+- `node-version`: Node.js version to use
 
-4. **Push to main branch** to trigger automatic publishing
+## 📖 Setup Instructions
 
-## How to get Dev.to API Key
+### Getting Hashnode Credentials:
+1. Go to Hashnode → Settings → Developer
+2. Generate Personal Access Token
+3. Get Publication ID and Host from publication settings
 
-1. Log in to Dev.to
-2. Go to Settings (click your profile picture → Settings)
-3. Navigate to "Extensions" section
-4. Scroll down to "DEV Community API Keys"
-5. Click "Generate API Key"
-6. Copy the generated key and add it to your GitHub secrets
+### Getting Dev.to API Key:
+1. Go to Dev.to → Settings → Extensions  
+2. Generate API Key under "DEV Community API Keys"
 
-name: Auto publish on dev.to
+### Setting up GitHub Token:
+1. Go to GitHub → Settings → Developer settings → Personal access tokens
+2. Generate token with `repo` and `actions:write` scopes
+3. Add as `VAR_EDIT_TOKEN_GIT` secret
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+## 🤝 Contributing
 
-jobs:
-  publish:
-    uses: YOUR_USERNAME/YOUR_REPO/.github/workflows/devto-publish-reusable.yml@main
-    secrets:
-      DEV_TO_API_KEY: ${{ secrets.DEV_TO_API_KEY }}
-      VAR_EDIT_TOKEN_GIT: ${{ secrets.VAR_EDIT_TOKEN_GIT }}
+Feel free to submit issues and enhancement requests!
+
+## 📄 License
+
+MIT License

@@ -12,21 +12,33 @@ const __dirname = path.dirname(__filename);
  * Also extracts tags from the end of the README if present.
  */
 async function getReadmeData() {
-  const rootDir = path.resolve(__dirname, '..');
-  const possibleFiles = ['README.md', 'Readme.md', 'readme.md'];
+  const rootDir = process.env.USER_REPO_PATH || path.resolve(__dirname, '..');
+  const contentPath = process.env.USER_CONTENT_PATH || 'content';
+  
+  // Multiple possible locations for README
+  const possibleLocations = [
+    path.join(rootDir, contentPath, 'README.md'),
+    path.join(rootDir, contentPath, 'Readme.md'), 
+    path.join(rootDir, contentPath, 'readme.md'),
+    path.join(rootDir, 'README.md'),
+    path.join(rootDir, 'Readme.md'),
+    path.join(rootDir, 'readme.md')
+  ];
 
   let filepath, content;
 
   // Find README.md file
-  for (const filename of possibleFiles) {
+  for (const location of possibleLocations) {
     try {
-      filepath = path.join(rootDir, filename);
+      filepath = location;
       content = await fs.readFile(filepath, 'utf-8');
+      console.error(`✅ Found README at: ${filepath}`);
       break;
     } catch {}
   }
+  
   if (!content) {
-    throw new Error(`README file not found. Tried: ${possibleFiles.join(', ')}`);
+    throw new Error(`README file not found. Tried: ${possibleLocations.join(', ')}`);
   }
 
   // Get repo details from env vars provided by workflow
@@ -136,7 +148,7 @@ async function findExistingPostByTitle(title) {
 
   const variables = {
     host: process.env.HASHNODE_PUBLICATION_HOST,
-    first: 50, // Adjust based on how many posts you might have
+    first: 50,
   };
 
   try {
@@ -225,7 +237,6 @@ async function publishNewArticle(title, content, tags) {
     }
   `;
 
-  // Convert string tags to proper tag objects
   const formattedTags = tags ? tags.map(tag => ({
     slug: tag.toLowerCase().replace(/\s+/g, ''),
     name: tag
@@ -263,7 +274,6 @@ async function updateExistingArticle(postId, title, content, tags) {
     }
   `;
 
-  // Convert string tags to proper tag objects
   const formattedTags = tags ? tags.map(tag => ({
     slug: tag.toLowerCase().replace(/\s+/g, ''),
     name: tag
@@ -298,7 +308,6 @@ function createSlug(title) {
  * Validates if an ID looks like a Hashnode post ID
  */
 function isValidHashnodeId(id) {
-  // Hashnode IDs are typically 24-character MongoDB ObjectIds
   return id && id.length >= 20 && /^[a-zA-Z0-9]+$/.test(id);
 }
 
@@ -312,7 +321,6 @@ export async function postOrUpdateArticle({ existingEnv }) {
   console.error(`Processing article: "${title}"`);
   console.error(`Generated slug: "${slug}"`);
 
-  // Strategy 1: Check if we have a VALID Hashnode post ID from environment
   if (existingEnv?.id && isValidHashnodeId(existingEnv.id)) {
     console.error(`Using saved Hashnode post ID: ${existingEnv.id}`);
     isUpdating = true;
@@ -321,7 +329,6 @@ export async function postOrUpdateArticle({ existingEnv }) {
     console.error(`Saved ID (${existingEnv.id}) appears to be from another platform, ignoring...`);
   }
 
-  // Strategy 2: Try to find existing post by title (more reliable)
   if (!existingPost) {
     existingPost = await findExistingPostByTitle(title);
     if (existingPost) {
@@ -329,7 +336,6 @@ export async function postOrUpdateArticle({ existingEnv }) {
     }
   }
 
-  // Strategy 3: If title search fails, try slug search
   if (!existingPost) {
     existingPost = await getPostBySlug(slug);
     if (existingPost) {
@@ -358,7 +364,6 @@ export async function postOrUpdateArticle({ existingEnv }) {
       method: isUpdating ? 'UPDATE' : 'POST',
     };
 
-    // ONLY output the JSON to stdout - this is what gets parsed by GitHub Actions
     console.log(JSON.stringify(postDetails));
     return postDetails;
 
@@ -369,7 +374,6 @@ export async function postOrUpdateArticle({ existingEnv }) {
       ...existingEnv,
     };
     console.error('Error posting/updating:', errorDetails.message);
-    // Output error as JSON to stdout for GitHub Actions to parse
     console.log(JSON.stringify(errorDetails));
     process.exit(1);
   }
@@ -389,10 +393,16 @@ async function main() {
     }
   }
 
+  // Add validation for user repository access
+  const userRepoPath = process.env.USER_REPO_PATH;
+  const userContentPath = process.env.USER_CONTENT_PATH || 'content';
+  
   console.error('Environment check:');
   console.error(`- HASHNODE_PUBLICATION_HOST: ${process.env.HASHNODE_PUBLICATION_HOST}`);
   console.error(`- HASHNODE_PUBLICATION_ID: ${process.env.HASHNODE_PUBLICATION_ID}`);
   console.error(`- HASHNODE_PAT: ${process.env.HASHNODE_PAT ? 'Set' : 'Not set'}`);
+  console.error(`- USER_REPO_PATH: ${userRepoPath || 'Not set'}`);
+  console.error(`- USER_CONTENT_PATH: ${userContentPath}`);
 
   const envVars = {
     id: process.env.HASHNODE_SAVED_POST_ID,

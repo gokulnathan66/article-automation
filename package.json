@@ -1,7 +1,16 @@
 {
-  "dependencies": {
-    "dotenv": "^17.2.1"
+  "name": "multi-platform-blog-publisher",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "GitHub Actions for publishing to multiple blog platforms",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "type": "module"
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  },
+  "keywords": ["github-actions", "blog", "automation", "hashnode", "devto"],
+  "author": "Your Name",
+  "license": "MIT"
 }
-
