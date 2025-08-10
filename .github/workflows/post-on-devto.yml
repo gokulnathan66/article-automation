@@ -40,7 +40,7 @@ jobs:
           
           # Run script silently
           echo "🔄 Processing article..."
-          node api/devto_post.js > post_output.json 
+          node api/devto_post.js > post_output.json 2>/dev/null
           
           # Validate and process JSON
           if jq empty post_output.json 2>/dev/null; then
