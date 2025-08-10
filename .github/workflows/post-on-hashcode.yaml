@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'  # Use latest LTS version
-          cache: 'npm'  # Cache npm dependencies
+          # cache: 'npm'  # Cache npm dependencies
 
       # 4️⃣ Validate required environment variables
       - name: Validate configuration
