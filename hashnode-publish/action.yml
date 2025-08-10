@@ -26,7 +26,6 @@ inputs:
     description: 'Path to the content/markdown files in user repo'
     required: false
     default: 'content'
-  # Add inputs for saved post data
   saved-post-id:
     description: 'Previously saved Hashnode post ID'
     required: false
@@ -58,7 +57,7 @@ runs:
     - name: Checkout action repository
       uses: actions/checkout@v4
       with:
-        repository: ${{ github.action_repository }}
+        repository: gokulnathan66/article-automation
         path: action-repo
         
     - name: Set up Node.js
@@ -96,10 +95,42 @@ runs:
         export USER_CONTENT_PATH="${{ inputs.content-path }}"
         export USER_REPO_PATH="$GITHUB_WORKSPACE"
         
+        # Debug: Show environment
+        echo "🔍 Debug Info:"
+        echo "- USER_REPO_PATH: $USER_REPO_PATH"
+        echo "- USER_CONTENT_PATH: $USER_CONTENT_PATH"
+        echo "- Current directory: $(pwd)"
+        echo "- User repo contents:"
+        ls -la "$USER_REPO_PATH" || echo "User repo path not found"
+        echo "- Content directory:"
+        ls -la "$USER_REPO_PATH/$USER_CONTENT_PATH" 2>/dev/null || echo "Content directory not found"
+        
         # Run script from action repository
         echo "🔄 Processing Hashnode article..."
         cd action-repo
-        node hashnode-publish/scripts/hashnode.js > ../post_output.json 2>/dev/null
+        
+        # Check if script exists
+        if [ ! -f "hashnode-publish/scripts/hashnode.js" ]; then
+          echo "❌ Error: hashnode.js script not found!"
+          echo "Available files in action-repo:"
+          find . -name "*.js" -type f 2>/dev/null || echo "No JS files found"
+          exit 1
+        fi
+        
+        # Run script with error capture
+        echo "📝 Running Node.js script..."
+        if node hashnode-publish/scripts/hashnode.js > ../post_output.json 2>../script_error.log; then
+          echo "✅ Script executed successfully"
+        else
+          SCRIPT_EXIT_CODE=$?
+          echo "❌ Script execution failed with exit code: $SCRIPT_EXIT_CODE"
+          echo "Error output:"
+          cat ../script_error.log 2>/dev/null || echo "No error log available"
+          echo "Script stdout:"
+          cat ../post_output.json 2>/dev/null || echo "No output file generated"
+          exit $SCRIPT_EXIT_CODE
+        fi
+        
         cd ..
         
         # Validate and process JSON
@@ -142,12 +173,14 @@ runs:
           echo "🔗 Check your Hashnode dashboard for the published/updated article"
           
           # Clean up
-          rm -f post_output.json
+          rm -f post_output.json script_error.log
           
         else
           echo "❌ Error: Invalid JSON output from Hashnode script"
           echo "Script output (for debugging):"
-          cat post_output.json
+          cat post_output.json 2>/dev/null || echo "No output file"
+          echo "Error log:"
+          cat script_error.log 2>/dev/null || echo "No error log"
           exit 1
         fi
       shell: bash

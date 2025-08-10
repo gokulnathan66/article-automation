@@ -9,11 +9,13 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Reads README.md and replaces relative links with raw GitHub URLs.
- * Also extracts tags from the end of the README if present.
  */
 async function getReadmeData() {
   const rootDir = process.env.USER_REPO_PATH || path.resolve(__dirname, '..');
   const contentPath = process.env.USER_CONTENT_PATH || 'content';
+  
+  console.error(`🔍 Looking for README in: ${rootDir}`);
+  console.error(`🔍 Content path: ${contentPath}`);
   
   // Multiple possible locations for README
   const possibleLocations = [
@@ -34,7 +36,9 @@ async function getReadmeData() {
       content = await fs.readFile(filepath, 'utf-8');
       console.error(`✅ Found README at: ${filepath}`);
       break;
-    } catch {}
+    } catch (error) {
+      console.error(`❌ Not found at: ${location}`);
+    }
   }
   
   if (!content) {
@@ -46,6 +50,8 @@ async function getReadmeData() {
   const repo = process.env.GITHUB_REPO || 'unknown-repo';
   const branch = process.env.GITHUB_BRANCH || 'main';
 
+  console.error(`📋 Repository: ${username}/${repo} (branch: ${branch})`);
+
   function toRawGitHubUrl(relativePath) {
     const normalizedPath = relativePath.replace(/\\/g, '/');
     return `https://raw.githubusercontent.com/${username}/${repo}/${branch}/${normalizedPath}`;
@@ -53,7 +59,9 @@ async function getReadmeData() {
 
   // 1. Replace relative markdown images
   content = content.replace(/!\[([^\]]*)\]\((?!https?:\/\/)([^)]+)\)/g, (m, alt, imgPath) => {
-    return `![${alt}](${toRawGitHubUrl(imgPath)})`;
+    const newUrl = `![${alt}](${toRawGitHubUrl(imgPath)})`;
+    console.error(`🔄 Replaced image: ${imgPath} -> ${toRawGitHubUrl(imgPath)}`);
+    return newUrl;
   });
 
   // 2. Replace relative markdown links for certain file types
@@ -78,6 +86,8 @@ async function getReadmeData() {
   const titleLine = content.split('\n').find(line => line.startsWith('# '));
   const title = titleLine ? titleLine.replace(/^#\s+/, '').trim() : 'Untitled Post';
 
+  console.error(`📝 Extracted title: "${title}"`);
+
   // Extract tags from a line starting with "TAGS:" or "Tags:"
   let tags;
   const tagLine = content.split('\n')
@@ -92,6 +102,7 @@ async function getReadmeData() {
     if (tags.length === 0) {
       tags = undefined;
     }
+    console.error(`🏷️ Extracted tags: ${tags ? tags.join(', ') : 'none'}`);
   }
 
   return { title, body: content.trim(), tags };
@@ -101,6 +112,8 @@ async function getReadmeData() {
  * Makes GraphQL requests to Hashnode API
  */
 async function makeHashnodeRequest(query, variables = {}) {
+  console.error('🌐 Making Hashnode API request...');
+  
   const response = await fetch('https://gql.hashnode.com', {
     method: 'POST',
     headers: {
@@ -152,11 +165,11 @@ async function findExistingPostByTitle(title) {
   };
 
   try {
-    console.error(`Searching for existing post with title: "${title}"`);
+    console.error(`🔍 Searching for existing post with title: "${title}"`);
     const data = await makeHashnodeRequest(query, variables);
     
     if (!data.publication) {
-      console.error(`Publication not found for host: ${process.env.HASHNODE_PUBLICATION_HOST}`);
+      console.error(`❌ Publication not found for host: ${process.env.HASHNODE_PUBLICATION_HOST}`);
       return null;
     }
 
@@ -164,14 +177,14 @@ async function findExistingPostByTitle(title) {
     const existingPost = posts.find(post => post.title.trim() === title.trim());
     
     if (existingPost) {
-      console.error(`Found existing post: ${existingPost.id} - "${existingPost.title}"`);
+      console.error(`✅ Found existing post: ${existingPost.id} - "${existingPost.title}"`);
     } else {
-      console.error('No existing post found with matching title');
+      console.error('ℹ️ No existing post found with matching title');
     }
     
     return existingPost;
   } catch (error) {
-    console.error('Error searching for existing post:', error.message);
+    console.error('❌ Error searching for existing post:', error.message);
     return null;
   }
 }
@@ -201,19 +214,19 @@ async function getPostBySlug(slug) {
   };
 
   try {
-    console.error(`Searching for existing post with slug: "${slug}"`);
+    console.error(`🔍 Searching for existing post with slug: "${slug}"`);
     const data = await makeHashnodeRequest(query, variables);
     
     const post = data.publication?.post;
     if (post) {
-      console.error(`Found existing post by slug: ${post.id} - "${post.title}"`);
+      console.error(`✅ Found existing post by slug: ${post.id} - "${post.title}"`);
     } else {
-      console.error('No existing post found with matching slug');
+      console.error('ℹ️ No existing post found with matching slug');
     }
     
     return post;
   } catch (error) {
-    console.error('Error searching by slug:', error.message);
+    console.error('❌ Error searching by slug:', error.message);
     return null;
   }
 }
@@ -222,6 +235,8 @@ async function getPostBySlug(slug) {
  * Publishes a new article to Hashnode
  */
 async function publishNewArticle(title, content, tags) {
+  console.error('📝 Publishing new article to Hashnode...');
+  
   const mutation = `
     mutation PublishPost($input: PublishPostInput!) {
       publishPost(input: $input) {
@@ -259,6 +274,8 @@ async function publishNewArticle(title, content, tags) {
  * Updates an existing article on Hashnode
  */
 async function updateExistingArticle(postId, title, content, tags) {
+  console.error(`🔄 Updating existing article: ${postId}`);
+  
   const mutation = `
     mutation UpdatePost($input: UpdatePostInput!) {
       updatePost(input: $input) {
@@ -318,15 +335,15 @@ export async function postOrUpdateArticle({ existingEnv }) {
   let isUpdating = false;
   let existingPost = null;
 
-  console.error(`Processing article: "${title}"`);
-  console.error(`Generated slug: "${slug}"`);
+  console.error(`🚀 Processing article: "${title}"`);
+  console.error(`🔗 Generated slug: "${slug}"`);
 
   if (existingEnv?.id && isValidHashnodeId(existingEnv.id)) {
-    console.error(`Using saved Hashnode post ID: ${existingEnv.id}`);
+    console.error(`💾 Using saved Hashnode post ID: ${existingEnv.id}`);
     isUpdating = true;
     existingPost = { id: existingEnv.id };
   } else if (existingEnv?.id) {
-    console.error(`Saved ID (${existingEnv.id}) appears to be from another platform, ignoring...`);
+    console.error(`⚠️ Saved ID (${existingEnv.id}) appears to be from another platform, ignoring...`);
   }
 
   if (!existingPost) {
@@ -347,10 +364,10 @@ export async function postOrUpdateArticle({ existingEnv }) {
 
   try {
     if (isUpdating && existingPost) {
-      console.error(`Updating existing post: ${existingPost.id}`);
+      console.error(`🔄 Updating existing post: ${existingPost.id}`);
       postResult = await updateExistingArticle(existingPost.id, title, body, tags);
     } else {
-      console.error('Publishing new post');
+      console.error('📝 Publishing new post');
       postResult = await publishNewArticle(title, body, tags);
     }
 
@@ -364,6 +381,7 @@ export async function postOrUpdateArticle({ existingEnv }) {
       method: isUpdating ? 'UPDATE' : 'POST',
     };
 
+    console.error(`✅ Success! Post ${isUpdating ? 'updated' : 'published'}: ${postDetails.url}`);
     console.log(JSON.stringify(postDetails));
     return postDetails;
 
@@ -373,58 +391,60 @@ export async function postOrUpdateArticle({ existingEnv }) {
       message: error.message || 'Unknown error',
       ...existingEnv,
     };
-    console.error('Error posting/updating:', errorDetails.message);
+    console.error('❌ Error posting/updating:', errorDetails.message);
     console.log(JSON.stringify(errorDetails));
     process.exit(1);
   }
 }
 
 async function main() {
-  // Validate required environment variables
-  const requiredVars = [
-    'HASHNODE_PAT',
-    'HASHNODE_PUBLICATION_ID',
-    'HASHNODE_PUBLICATION_HOST'
-  ];
+  try {
+    // Validate required environment variables
+    const requiredVars = [
+      'HASHNODE_PAT',
+      'HASHNODE_PUBLICATION_ID',
+      'HASHNODE_PUBLICATION_HOST'
+    ];
 
-  for (const varName of requiredVars) {
-    if (!process.env[varName]) {
-      throw new Error(`${varName} environment variable is required`);
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
     }
-  }
 
-  // Add validation for user repository access
-  const userRepoPath = process.env.USER_REPO_PATH;
-  const userContentPath = process.env.USER_CONTENT_PATH || 'content';
-  
-  console.error('Environment check:');
-  console.error(`- HASHNODE_PUBLICATION_HOST: ${process.env.HASHNODE_PUBLICATION_HOST}`);
-  console.error(`- HASHNODE_PUBLICATION_ID: ${process.env.HASHNODE_PUBLICATION_ID}`);
-  console.error(`- HASHNODE_PAT: ${process.env.HASHNODE_PAT ? 'Set' : 'Not set'}`);
-  console.error(`- USER_REPO_PATH: ${userRepoPath || 'Not set'}`);
-  console.error(`- USER_CONTENT_PATH: ${userContentPath}`);
+    const userRepoPath = process.env.USER_REPO_PATH;
+    const userContentPath = process.env.USER_CONTENT_PATH || 'content';
+    
+    console.error('🔍 Environment check:');
+    console.error(`- HASHNODE_PUBLICATION_HOST: ${process.env.HASHNODE_PUBLICATION_HOST}`);
+    console.error(`- HASHNODE_PUBLICATION_ID: ${process.env.HASHNODE_PUBLICATION_ID}`);
+    console.error(`- HASHNODE_PAT: ${process.env.HASHNODE_PAT ? 'Set' : 'Not set'}`);
+    console.error(`- USER_REPO_PATH: ${userRepoPath || 'Not set'}`);
+    console.error(`- USER_CONTENT_PATH: ${userContentPath}`);
 
-  const envVars = {
-    id: process.env.HASHNODE_SAVED_POST_ID,
-    slug: process.env.HASHNODE_SAVED_POST_SLUG,
-    title: process.env.HASHNODE_SAVED_POST_TITLE,
-    url: process.env.HASHNODE_SAVED_POST_URL,
-    published_at: process.env.HASHNODE_SAVED_POST_PUBLISHED_AT,
-    updated_at: process.env.HASHNODE_SAVED_POST_UPDATED_AT,
-  };
-  
-  const existingEnv = envVars.id ? envVars : null;
-  
-  if (existingEnv) {
-    console.error('Found saved post data:', existingEnv);
-  } else {
-    console.error('No saved post data found, will check for existing posts by title/slug');
+    const envVars = {
+      id: process.env.HASHNODE_SAVED_POST_ID,
+      slug: process.env.HASHNODE_SAVED_POST_SLUG,
+      title: process.env.HASHNODE_SAVED_POST_TITLE,
+      url: process.env.HASHNODE_SAVED_POST_URL,
+      published_at: process.env.HASHNODE_SAVED_POST_PUBLISHED_AT,
+      updated_at: process.env.HASHNODE_SAVED_POST_UPDATED_AT,
+    };
+    
+    const existingEnv = envVars.id ? envVars : null;
+    
+    if (existingEnv) {
+      console.error('💾 Found saved post data:', existingEnv);
+    } else {
+      console.error('ℹ️ No saved post data found, will check for existing posts by title/slug');
+    }
+    
+    await postOrUpdateArticle({ existingEnv });
+  } catch (error) {
+    console.error('💥 Fatal error:', error.message);
+    console.error('Stack trace:', error.stack);
+    process.exit(1);
   }
-  
-  await postOrUpdateArticle({ existingEnv });
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+main();
