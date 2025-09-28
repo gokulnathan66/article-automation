@@ -57,7 +57,7 @@ This project automates the process of synchronizing content between GitHub READM
 ## Quick Start
 
 ### 1. Fork or Use This Repository
-![gokulnathan66 article-automation Repo](https://github.com/gokulnathan66/article-automation)
+[gokulnathan66 article-automation Repo](https://github.com/gokulnathan66/article-automation)
 
 You can either fork this repository or use it as a GitHub Action in your own repository.
 
